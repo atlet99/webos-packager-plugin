@@ -76,9 +76,7 @@ class AssetPackagerPlugin extends AssetPlugin {
 
 	protected async hook(compilation: Compilation) {
 		const builder = new IPKBuilder(this.metadata);
-		const compilations = await Promise.all(
-			this.hooks.map(x => x.value(compilation)),
-		);
+		const compilations = await Promise.all(this.hooks.map(x => x.value()));
 
 		for await (const { namespace, assets } of compilations) {
 			const map: Record<string, Buffer> = {};
@@ -147,32 +145,66 @@ class AssetPackagerPlugin extends AssetPlugin {
 class AssetHookPlugin extends AssetPlugin {
 	protected pluginName = 'AssetHookPlugin';
 
-	private lastCompilation: Compilation | null = null;
-	private currentValue: HookDeferredValue | null = null;
-	private deferred = new Deferred<HookDeferredValue>();
+	private pending: HookDeferredValue[] = [];
+	private deferred: Deferred<HookDeferredValue> | null = null;
+	private readonly pushedCompilations = new WeakSet<Compilation>();
 
 	public constructor(private readonly namespace: Namespace) {
 		super(Compilation.PROCESS_ASSETS_STAGE_SUMMARIZE);
 	}
 
-	public value(compilation: Compilation) {
-		if (this.lastCompilation === compilation && this.currentValue) {
-			return Promise.resolve(this.currentValue);
+	public apply(compiler: Compiler) {
+		super.apply(compiler);
+
+		compiler.hooks.done.tap(this.pluginName, stats => {
+			if (this.pushedCompilations.has(stats.compilation)) {
+				return;
+			}
+
+			this.push({
+				namespace: this.namespace,
+				assets: stats.compilation.assets,
+			});
+			this.pushedCompilations.add(stats.compilation);
+		});
+
+		compiler.hooks.failed.tap(this.pluginName, () => {
+			this.push({
+				namespace: this.namespace,
+				assets: {} as Compilation['assets'],
+			});
+		});
+	}
+
+	public value() {
+		if (this.pending.length > 0) {
+			return Promise.resolve(this.pending.shift()!);
 		}
 
+		this.deferred ??= new Deferred<HookDeferredValue>();
 		return this.deferred.promise;
 	}
 
 	protected hook(compilation: Compilation) {
-		const value = {
+		if (this.pushedCompilations.has(compilation)) {
+			return;
+		}
+
+		this.push({
 			namespace: this.namespace,
 			assets: compilation.assets,
-		};
+		});
+		this.pushedCompilations.add(compilation);
+	}
 
-		this.lastCompilation = compilation;
-		this.currentValue = value;
-		this.deferred.resolve(value);
-		this.deferred = new Deferred<HookDeferredValue>();
+	private push(value: HookDeferredValue) {
+		if (this.deferred) {
+			this.deferred.resolve(value);
+			this.deferred = null;
+			return;
+		}
+
+		this.pending.push(value);
 	}
 }
 
