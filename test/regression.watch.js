@@ -1,4 +1,5 @@
 const assert = require('assert');
+const { createHash } = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -43,17 +44,18 @@ const run = () =>
 			}
 
 			const filename = path.join(workdir, 'com.example.app_1.0.0_all.ipk');
-			resolve(fs.statSync(filename).size);
+			const content = fs.readFileSync(filename);
+			resolve(createHash('sha256').update(content).digest('hex'));
 		});
 	});
 
 (async () => {
 	try {
-		const firstSize = await run();
-		const secondSize = await run();
+		const firstHash = await run();
+		const secondHash = await run();
 
-		assert.ok(firstSize > 0);
-		assert.equal(firstSize, secondSize);
+		assert.ok(firstHash.length > 0);
+		assert.equal(firstHash, secondHash);
 	} finally {
 		await new Promise(resolve => compiler.close(() => resolve()));
 	}

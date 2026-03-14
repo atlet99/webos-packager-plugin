@@ -23,6 +23,7 @@ const SHEBANG_MAGIC = 0x2321;
 export class IPKBuilder {
 	private readonly ar = new ArWriter();
 	private readonly data = pack();
+	private readonly packageId: string;
 	private readonly namespaces: Record<Namespace['type'], Set<string>> = {
 		app: new Set(),
 		service: new Set(),
@@ -30,6 +31,7 @@ export class IPKBuilder {
 	private readonly createdParents = new Set<string>();
 
 	public constructor(private readonly metadata: PackageMetadata) {
+		this.packageId = this.normalizeIdentifier(metadata.id, 'package id');
 		this.ar.append('debian-binary', '2.0\n');
 	}
 
@@ -37,13 +39,14 @@ export class IPKBuilder {
 		{ id, type }: Namespace,
 		assets: { [path: string]: Buffer },
 	) {
-		const root = `usr/palm/${NAMESPACE_MAP[type]}/${id}`;
+		const namespaceId = this.normalizeIdentifier(id, `${type} id`);
+		const root = `usr/palm/${NAMESPACE_MAP[type]}/${namespaceId}`;
 		const tree = new Set<string>(getDirectoryParents(root));
 		const entries = Object.entries(assets).map(
 			([asset, buffer]) => [this.normalizeAssetPath(asset), buffer] as const,
 		);
 
-		this.namespaces[type].add(id);
+		this.namespaces[type].add(namespaceId);
 
 		for (const [asset] of entries) {
 			tree.add(join(root, dirname(asset)));
@@ -104,6 +107,21 @@ export class IPKBuilder {
 		return target;
 	}
 
+	private normalizeIdentifier(value: string, kind: string): string {
+		if (
+			typeof value !== 'string' ||
+			value.trim() === '' ||
+			value === '.' ||
+			value === '..' ||
+			value.includes('/') ||
+			value.includes('\\')
+		) {
+			throw new IPKBuilderError(`Invalid ${kind}: ${value}`);
+		}
+
+		return value;
+	}
+
 	private async collectTarball(packer: Pack): Promise<Buffer> {
 		packer.finalize();
 
@@ -124,7 +142,7 @@ export class IPKBuilder {
 		const tarball = pack();
 
 		const control: ControlSection = {
-			Package: this.metadata.id,
+			Package: this.packageId,
 			Version: this.metadata.version,
 			Section: 'misc',
 			Priority: 'optional',
@@ -144,20 +162,22 @@ export class IPKBuilder {
 	}
 
 	private async appendDataSection() {
-		const app = this.namespaces.app.values().next().value;
-
-		if (!app) {
-			throw new IPKBuilderError('Package must include one app namespace.');
+		if (this.namespaces.app.size !== 1) {
+			throw new IPKBuilderError(
+				'Package must include exactly one app namespace.',
+			);
 		}
 
+		const app = this.namespaces.app.values().next().value!;
+
 		const packageInfo = {
-			id: this.metadata.id,
+			id: this.packageId,
 			version: this.metadata.version,
 			app,
 			services: Array.from(this.namespaces.service.values()),
 		};
 
-		const root = `usr/palm/packages/${this.metadata.id}`;
+		const root = `usr/palm/packages/${this.packageId}`;
 
 		for (const name of getDirectoryParents(root)) {
 			if (!this.createdParents.has(name)) {

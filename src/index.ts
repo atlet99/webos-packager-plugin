@@ -19,6 +19,25 @@ import type {
 
 export type { FlavoredConfig } from './declarations';
 
+const assertIdentifier = (name: string, value: string) => {
+	if (typeof value !== 'string' || value.trim() === '') {
+		throw new TypeError(
+			`WebOSPackagerPlugin: "${name}" must be a non-empty string.`,
+		);
+	}
+
+	if (
+		value === '.' ||
+		value === '..' ||
+		value.includes('/') ||
+		value.includes('\\')
+	) {
+		throw new TypeError(
+			`WebOSPackagerPlugin: "${name}" contains invalid path characters.`,
+		);
+	}
+};
+
 abstract class AssetPlugin implements Plugin {
 	protected abstract readonly pluginName: string;
 
@@ -178,11 +197,7 @@ export class WebOSPackagerPlugin implements Plugin {
 	private static validateOptions(
 		options: PackageMetadata & PackagerOptions & Namespace,
 	) {
-		if (typeof options.id !== 'string' || options.id.trim() === '') {
-			throw new TypeError(
-				'WebOSPackagerPlugin: "id" must be a non-empty string.',
-			);
-		}
+		assertIdentifier('id', options.id);
 
 		if (typeof options.version !== 'string' || options.version.trim() === '') {
 			throw new TypeError(
@@ -201,6 +216,8 @@ export class WebOSPackagerPlugin implements Plugin {
 export const hoc =
 	<E extends Record<string, any> = {}>(definition: HOCDefinition) =>
 	(...argv: [WebpackEnvironment<E>, WebpackArgv<E>]) => {
+		assertIdentifier('definition.id', definition.id);
+
 		const invoke = (config: FlavoredConfig) =>
 			Object.defineProperties(
 				typeof config === 'function' ? config(...argv) : config,
@@ -215,6 +232,7 @@ export const hoc =
 		});
 
 		const app = invoke(definition.app);
+		assertIdentifier('app.id', app.id);
 		const hook = new AssetHookPlugin({ id: app.id, type: 'app' });
 
 		app.plugins ??= [];
@@ -224,6 +242,7 @@ export const hoc =
 
 		const services = definition.services?.map(service => {
 			const svc = invoke(service);
+			assertIdentifier('service.id', svc.id);
 			const hook = new AssetHookPlugin({ id: svc.id, type: 'service' });
 
 			svc.plugins ??= [];
