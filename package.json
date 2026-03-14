@@ -9,7 +9,8 @@
 		"kitsuned"
 	],
 	"scripts": {
-		"build": "tsc"
+		"build": "tsc",
+		"test": "npm run build && node test/regression.watch.js && node test/regression.traversal.js && node test/regression.plugin-options.js && node test/regression.service-only.js"
 	},
 	"files": [
 		"dist",

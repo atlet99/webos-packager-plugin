@@ -1,12 +1,16 @@
 import { constants, createGzip } from 'zlib';
-import { dirname, join } from 'path/posix';
+import { dirname, join, normalize } from 'path/posix';
 
 import { Pack, pack } from 'tar-stream';
 
 import { ArWriter } from './ar';
 import { getDirectoryParents } from './utils';
 
-import type { ControlSection, Namespace, PackageMetadata } from './declarations';
+import type {
+	ControlSection,
+	Namespace,
+	PackageMetadata,
+} from './declarations';
 
 const NAMESPACE_MAP: Record<Namespace['type'], string> = {
 	app: 'applications',
@@ -29,14 +33,20 @@ export class IPKBuilder {
 		this.ar.append('debian-binary', '2.0\n');
 	}
 
-	public addEntries({ id, type }: Namespace, assets: { [path: string]: Buffer }) {
+	public addEntries(
+		{ id, type }: Namespace,
+		assets: { [path: string]: Buffer },
+	) {
 		const root = `usr/palm/${NAMESPACE_MAP[type]}/${id}`;
 		const tree = new Set<string>(getDirectoryParents(root));
+		const entries = Object.entries(assets).map(
+			([asset, buffer]) => [this.normalizeAssetPath(asset), buffer] as const,
+		);
 
 		this.namespaces[type].add(id);
 
-		for (const path in assets) {
-			tree.add(join(root, dirname(path)));
+		for (const [asset] of entries) {
+			tree.add(join(root, dirname(asset)));
 		}
 
 		for (const name of tree) {
@@ -47,8 +57,8 @@ export class IPKBuilder {
 			this.createdParents.add(name);
 		}
 
-		for (const [asset, buffer] of Object.entries(assets)) {
-			const name = `${root}/${asset}`;
+		for (const [asset, buffer] of entries) {
+			const name = join(root, asset);
 			const mode = this.isExecutable(buffer) ? 0o755 : 0o644;
 
 			this.data.entry({ name, mode }, buffer);
@@ -77,6 +87,23 @@ export class IPKBuilder {
 		);
 	}
 
+	private normalizeAssetPath(path: string): string {
+		const target = normalize(path.replace(/\\/g, '/'));
+
+		if (
+			target === '' ||
+			target === '.' ||
+			target === '..' ||
+			target.startsWith('../') ||
+			target.includes('/../') ||
+			target.startsWith('/')
+		) {
+			throw new IPKBuilderError(`Invalid asset path: ${path}`);
+		}
+
+		return target;
+	}
+
 	private async collectTarball(packer: Pack): Promise<Buffer> {
 		packer.finalize();
 
@@ -91,7 +118,9 @@ export class IPKBuilder {
 		return Buffer.concat(chunks);
 	}
 
-	private async appendControlSection(overrides?: Partial<ControlSection>): Promise<void> {
+	private async appendControlSection(
+		overrides?: Partial<ControlSection>,
+	): Promise<void> {
 		const tarball = pack();
 
 		const control: ControlSection = {
@@ -115,10 +144,16 @@ export class IPKBuilder {
 	}
 
 	private async appendDataSection() {
+		const app = this.namespaces.app.values().next().value;
+
+		if (!app) {
+			throw new IPKBuilderError('Package must include one app namespace.');
+		}
+
 		const packageInfo = {
 			id: this.metadata.id,
 			version: this.metadata.version,
-			app: this.namespaces.app.values().next().value!,
+			app,
 			services: Array.from(this.namespaces.service.values()),
 		};
 

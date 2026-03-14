@@ -20,7 +20,7 @@ import type {
 export type { FlavoredConfig } from './declarations';
 
 abstract class AssetPlugin implements Plugin {
-	protected readonly abstract pluginName: string;
+	protected abstract readonly pluginName: string;
 
 	protected constructor(private readonly stage: number) {}
 
@@ -42,39 +42,39 @@ abstract class AssetPlugin implements Plugin {
 class AssetPackagerPlugin extends AssetPlugin {
 	protected pluginName = 'AssetPackagerPlugin';
 
-	private promises: PromiseLike<HookDeferredValue>[] = [];
-	private builder: IPKBuilder;
+	private hooks: AssetHookPlugin[] = [];
 
 	public constructor(
 		private readonly options: PackagerOptions | null,
 		private readonly metadata: PackageMetadata,
 	) {
 		super(Compilation.PROCESS_ASSETS_STAGE_OPTIMIZE_TRANSFER);
-
-		this.builder = new IPKBuilder(metadata);
 	}
 
-	public register(promise: PromiseLike<HookDeferredValue>) {
-		this.promises.push(promise);
+	public register(hook: AssetHookPlugin) {
+		this.hooks.push(hook);
 	}
 
 	protected async hook(compilation: Compilation) {
-		const compilations = await Promise.all(this.promises);
+		const builder = new IPKBuilder(this.metadata);
+		const compilations = await Promise.all(
+			this.hooks.map(x => x.value(compilation)),
+		);
 
 		for await (const { namespace, assets } of compilations) {
-			const map = Object.entries(assets).reduce(
-				(accumulator, [path, asset]) => ({
-					...accumulator,
-					[path]: asset.buffer(),
-				}),
-				{} as Record<string, Buffer>,
-			);
+			const map: Record<string, Buffer> = {};
 
-			this.builder.addEntries(namespace, map);
+			for (const [path, asset] of Object.entries(assets)) {
+				map[path] = asset.buffer();
+			}
+
+			builder.addEntries(namespace, map);
 		}
 
-		const filename = this.options?.filename ?? `${this.metadata.id}_${this.metadata.version}_all.ipk`;
-		const buffer = await this.builder.buffer();
+		const filename =
+			this.options?.filename ??
+			`${this.metadata.id}_${this.metadata.version}_all.ipk`;
+		const buffer = await builder.buffer();
 
 		compilation.emitAsset(filename, new sources.RawSource(buffer));
 
@@ -91,7 +91,10 @@ class AssetPackagerPlugin extends AssetPlugin {
 		}
 	}
 
-	private createManifestAsset(fileInfo: { ipkUrl: string, ipkHash: { sha256: string } }) {
+	private createManifestAsset(fileInfo: {
+		ipkUrl: string;
+		ipkHash: { sha256: string };
+	}) {
 		if (!this.options?.emitManifest) {
 			throw new TypeError('createManifestAsset: type guard');
 		}
@@ -107,7 +110,15 @@ class AssetPackagerPlugin extends AssetPlugin {
 		} = this.options.manifest;
 
 		const manifest = {
-			id, version, type, title, appDescription, iconUrl, sourceUri, rootRequired, ...fileInfo,
+			id,
+			version,
+			type,
+			title,
+			appDescription,
+			iconUrl,
+			sourceUri,
+			rootRequired,
+			...fileInfo,
 		};
 
 		return new sources.RawSource(JSON.stringify(manifest, null, '\t'));
@@ -117,21 +128,32 @@ class AssetPackagerPlugin extends AssetPlugin {
 class AssetHookPlugin extends AssetPlugin {
 	protected pluginName = 'AssetHookPlugin';
 
+	private lastCompilation: Compilation | null = null;
+	private currentValue: HookDeferredValue | null = null;
 	private deferred = new Deferred<HookDeferredValue>();
 
 	public constructor(private readonly namespace: Namespace) {
 		super(Compilation.PROCESS_ASSETS_STAGE_SUMMARIZE);
 	}
 
-	public get promise() {
+	public value(compilation: Compilation) {
+		if (this.lastCompilation === compilation && this.currentValue) {
+			return Promise.resolve(this.currentValue);
+		}
+
 		return this.deferred.promise;
 	}
 
 	protected hook(compilation: Compilation) {
-		this.deferred.resolve({
+		const value = {
 			namespace: this.namespace,
 			assets: compilation.assets,
-		});
+		};
+
+		this.lastCompilation = compilation;
+		this.currentValue = value;
+		this.deferred.resolve(value);
+		this.deferred = new Deferred<HookDeferredValue>();
 	}
 }
 
@@ -140,53 +162,77 @@ export class WebOSPackagerPlugin implements Plugin {
 	private readonly hook: AssetHookPlugin;
 
 	public constructor(options: PackageMetadata & PackagerOptions & Namespace) {
+		WebOSPackagerPlugin.validateOptions(options);
+
 		this.packager = new AssetPackagerPlugin(options, options);
 		this.hook = new AssetHookPlugin(options);
 
-		this.packager.register(this.hook.promise);
+		this.packager.register(this.hook);
 	}
 
 	public apply(compiler: Compiler) {
 		this.packager.apply(compiler);
 		this.hook.apply(compiler);
 	}
+
+	private static validateOptions(
+		options: PackageMetadata & PackagerOptions & Namespace,
+	) {
+		if (typeof options.id !== 'string' || options.id.trim() === '') {
+			throw new TypeError(
+				'WebOSPackagerPlugin: "id" must be a non-empty string.',
+			);
+		}
+
+		if (typeof options.version !== 'string' || options.version.trim() === '') {
+			throw new TypeError(
+				'WebOSPackagerPlugin: "version" must be a non-empty string.',
+			);
+		}
+
+		if (options.type !== 'app' && options.type !== 'service') {
+			throw new TypeError(
+				'WebOSPackagerPlugin: "type" must be "app" or "service".',
+			);
+		}
+	}
 }
 
 export const hoc =
 	<E extends Record<string, any> = {}>(definition: HOCDefinition) =>
-		(...argv: [WebpackEnvironment<E>, WebpackArgv<E>]) => {
-			const invoke = (config: FlavoredConfig) =>
-				Object.defineProperties(typeof config === 'function' ? config(...argv) : config, {
-					id: { enumerable: false },
-				});
-
-			const packager = new AssetPackagerPlugin(
-				definition.options ?? null,
+	(...argv: [WebpackEnvironment<E>, WebpackArgv<E>]) => {
+		const invoke = (config: FlavoredConfig) =>
+			Object.defineProperties(
+				typeof config === 'function' ? config(...argv) : config,
 				{
-					id: definition.id,
-					version: definition.version,
+					id: { enumerable: false },
 				},
 			);
 
-			const app = invoke(definition.app);
-			const hook = new AssetHookPlugin({ id: app.id, type: 'app' });
+		const packager = new AssetPackagerPlugin(definition.options ?? null, {
+			id: definition.id,
+			version: definition.version,
+		});
 
-			app.plugins ??= [];
-			app.plugins.push(packager, hook);
+		const app = invoke(definition.app);
+		const hook = new AssetHookPlugin({ id: app.id, type: 'app' });
 
-			packager.register(hook.promise);
+		app.plugins ??= [];
+		app.plugins.push(packager, hook);
 
-			const services = definition.services?.map(service => {
-				const svc = invoke(service);
-				const hook = new AssetHookPlugin({ id: svc.id, type: 'service' });
+		packager.register(hook);
 
-				svc.plugins ??= [];
-				svc.plugins.push(hook);
+		const services = definition.services?.map(service => {
+			const svc = invoke(service);
+			const hook = new AssetHookPlugin({ id: svc.id, type: 'service' });
 
-				packager.register(hook.promise);
+			svc.plugins ??= [];
+			svc.plugins.push(hook);
 
-				return svc;
-			});
+			packager.register(hook);
 
-			return [app, ...(services ?? [])];
-		};
+			return svc;
+		});
+
+		return [app, ...(services ?? [])];
+	};
