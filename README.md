@@ -1,3 +1,10 @@
+![NPM Version](https://img.shields.io/npm/v/%40atlet99%2Fwebos-packager-plugin?style=plastic)
+![GitHub Release](https://img.shields.io/github/v/release/atlet99/webos-packager-plugin)
+![GitHub License](https://img.shields.io/github/license/atlet99/webos-packager-plugin?style=plastic)
+![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/atlet99/webos-packager-plugin?style=plastic)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/atlet99/webos-packager-plugin/npm-publish.yml?style=plastic&label=Publish%20to%20registry)
+![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/w/atlet99/webos-packager-plugin/master?style=plastic)
+
 # @atlet99/webos-packager-plugin
 
 Pack webOS IPK files directly from webpack builds.
