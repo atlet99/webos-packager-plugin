@@ -1,4 +1,6 @@
 import { createHash } from 'crypto';
+import { readFileSync } from 'fs';
+import { join, normalize } from 'path/posix';
 
 import { Compilation, sources, type Compiler } from 'webpack';
 
@@ -9,9 +11,13 @@ import type {
 	FlavoredConfig,
 	HOCDefinition,
 	Namespace,
+	OutputFilename,
+	OutputFilenameContext,
 	PackageMetadata,
+	PackageMetadataInput,
 	PackagerOptions,
 	Plugin,
+	WebOSPackagerPluginOptions,
 	HookDeferredValue,
 	WebpackArgv,
 	WebpackEnvironment,
@@ -35,13 +41,117 @@ const assertNonEmptyString = (name: string, value: unknown) => {
 	}
 };
 
+const assertRelativePath = (name: string, value: unknown) => {
+	assertNonEmptyString(name, value);
+	const target = normalize((value as string).replace(/\\/g, '/'));
+
+	if (
+		target === '' ||
+		target === '.' ||
+		target === '..' ||
+		target.startsWith('../') ||
+		target.includes('/../') ||
+		target.startsWith('/')
+	) {
+		throw new TypeError(`WebOSPackagerPlugin: "${name}" contains invalid path segments.`);
+	}
+};
+
+const assertOutputFilename = (name: string, value: unknown) => {
+	if (typeof value === 'function') {
+		return;
+	}
+
+	assertRelativePath(name, value);
+};
+
+const VERSION_REGEXP = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+const assertVersion = (name: string, value: unknown) => {
+	assertNonEmptyString(name, value);
+
+	if (!VERSION_REGEXP.test((value as string).trim())) {
+		throw new TypeError(
+			`WebOSPackagerPlugin: "${name}" must be a valid semver-like value (x.y.z[-suffix]).`,
+		);
+	}
+};
+
+const resolveVersion = (input: PackageMetadataInput, prefix: string) => {
+	if (input.version !== undefined) {
+		assertVersion(`${prefix}.version`, input.version);
+		return input.version.trim();
+	}
+
+	const envKey = input.versionEnv?.trim() || 'RELEASE_VERSION';
+	const envVersion = process.env[envKey];
+
+	if (typeof envVersion === 'string' && envVersion.trim() !== '') {
+		assertVersion(`env.${envKey}`, envVersion);
+		return envVersion.trim();
+	}
+
+	if (input.versionFile !== undefined) {
+		assertNonEmptyString(`${prefix}.versionFile`, input.versionFile);
+
+		let content = '';
+
+		try {
+			content = readFileSync(input.versionFile, 'utf8').trim();
+		} catch {
+			throw new TypeError(
+				`WebOSPackagerPlugin: "${prefix}.versionFile" could not be read: ${input.versionFile}`,
+			);
+		}
+
+		assertVersion(`${prefix}.versionFile`, content);
+		return content;
+	}
+
+	throw new TypeError(
+		`WebOSPackagerPlugin: "${prefix}.version" must be provided, or set env "${envKey}", or provide "${prefix}.versionFile".`,
+	);
+};
+
 const assertPackagerOptions = (options: PackagerOptions | null | undefined, prefix = 'options') => {
 	if (!options) {
 		return;
 	}
 
 	if (options.filename !== undefined) {
-		assertNonEmptyString(`${prefix}.filename`, options.filename);
+		assertOutputFilename(`${prefix}.filename`, options.filename);
+	}
+
+	if (options.output?.filename !== undefined) {
+		assertOutputFilename(`${prefix}.output.filename`, options.output.filename);
+	}
+
+	if (options.output?.template !== undefined) {
+		assertRelativePath(`${prefix}.output.template`, options.output.template);
+	}
+
+	if (options.output?.dir !== undefined) {
+		assertRelativePath(`${prefix}.output.dir`, options.output.dir);
+	}
+
+	if (options.output?.variables !== undefined) {
+		if (!options.output.variables || typeof options.output.variables !== 'object') {
+			throw new TypeError(`WebOSPackagerPlugin: "${prefix}.output.variables" must be an object.`);
+		}
+
+		for (const [key, value] of Object.entries(options.output.variables)) {
+			if (typeof key !== 'string' || key.trim() === '') {
+				throw new TypeError(
+					`WebOSPackagerPlugin: "${prefix}.output.variables" contains an invalid key.`,
+				);
+			}
+
+			if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+				throw new TypeError(
+					`WebOSPackagerPlugin: "${prefix}.output.variables.${key}" must be a string, number or boolean.`,
+				);
+			}
+		}
 	}
 
 	if (!options.emitManifest) {
@@ -55,14 +165,21 @@ const assertPackagerOptions = (options: PackagerOptions | null | undefined, pref
 	}
 
 	const requiredStringFields = ['title', 'description', 'iconUrl', 'sourceUrl'] as const;
+	const allowedFields = new Set([
+		...requiredStringFields,
+		'rootRequired',
+		'type',
+	] satisfies ReadonlyArray<keyof typeof manifest>);
 
 	for (const key of requiredStringFields) {
-		if (typeof manifest[key] !== 'string') {
-			throw new TypeError(`WebOSPackagerPlugin: "${prefix}.manifest.${key}" must be a string.`);
-		}
+		assertNonEmptyString(`${prefix}.manifest.${key}`, manifest[key]);
 	}
 
 	for (const [key, value] of Object.entries(manifest)) {
+		if (!allowedFields.has(key as keyof typeof manifest)) {
+			throw new TypeError(`WebOSPackagerPlugin: "${prefix}.manifest.${key}" is not supported.`);
+		}
+
 		if (key === 'rootRequired') {
 			if (value !== undefined && typeof value !== 'boolean') {
 				throw new TypeError(
@@ -137,8 +254,7 @@ class AssetPackagerPlugin extends AssetPlugin {
 			builder.addEntries(namespace, map);
 		}
 
-		const filename =
-			this.options?.filename ?? `${this.metadata.id}_${this.metadata.version}_all.ipk`;
+		const filename = this.resolveOutputFilename();
 		const buffer = await builder.buffer();
 
 		compilation.emitAsset(filename, new sources.RawSource(buffer));
@@ -154,6 +270,59 @@ class AssetPackagerPlugin extends AssetPlugin {
 				}),
 			);
 		}
+	}
+
+	private resolveOutputFilename() {
+		const output = this.options?.output;
+		const defaultBaseName = `${this.metadata.id}_${this.metadata.version}_all`;
+		const context: OutputFilenameContext = {
+			id: this.metadata.id,
+			version: this.metadata.version,
+			ext: 'ipk',
+			baseName: defaultBaseName,
+		};
+		const filenameSource: OutputFilename | undefined = output?.filename ?? this.options?.filename;
+		let filename: string;
+
+		if (typeof filenameSource === 'function') {
+			filename = filenameSource(context);
+		} else if (typeof filenameSource === 'string') {
+			filename = filenameSource;
+		} else if (typeof output?.template === 'string') {
+			const variables = Object.fromEntries(
+				Object.entries(output.variables ?? {}).map(([key, value]) => [key, String(value)]),
+			);
+			const tokens = {
+				id: context.id,
+				version: context.version,
+				ext: context.ext,
+				baseName: context.baseName,
+				...variables,
+			};
+
+			filename = output.template.replace(/\[([A-Za-z0-9_]+)\]/g, (_, key: string) => {
+				if (!(key in tokens)) {
+					throw new TypeError(`WebOSPackagerPlugin: unknown output template token "${key}".`);
+				}
+
+				return tokens[key as keyof typeof tokens];
+			});
+		} else {
+			filename = `${defaultBaseName}.ipk`;
+		}
+
+		assertRelativePath('output filename', filename);
+
+		if (!filename.endsWith('.ipk')) {
+			filename = `${filename}.ipk`;
+		}
+
+		if (output?.dir) {
+			filename = join(output.dir, filename);
+		}
+
+		assertRelativePath('output filename', filename);
+		return filename;
 	}
 
 	private createManifestAsset(fileInfo: { ipkUrl: string; ipkHash: { sha256: string } }) {
@@ -212,13 +381,6 @@ class AssetHookPlugin extends AssetPlugin {
 			});
 			this.pushedCompilations.add(stats.compilation);
 		});
-
-		compiler.hooks.failed.tap(this.pluginName, () => {
-			this.push({
-				namespace: this.namespace,
-				assets: {} as Compilation['assets'],
-			});
-		});
 	}
 
 	public value() {
@@ -257,10 +419,10 @@ export class WebOSPackagerPlugin implements Plugin {
 	private readonly packager: AssetPackagerPlugin;
 	private readonly hook: AssetHookPlugin;
 
-	public constructor(options: PackageMetadata & PackagerOptions & Namespace) {
-		WebOSPackagerPlugin.validateOptions(options);
+	public constructor(options: WebOSPackagerPluginOptions) {
+		const metadata = WebOSPackagerPlugin.validateAndResolveMetadata(options);
 
-		this.packager = new AssetPackagerPlugin(options, options);
+		this.packager = new AssetPackagerPlugin(options, metadata);
 		this.hook = new AssetHookPlugin(options);
 
 		this.packager.register(this.hook);
@@ -271,15 +433,20 @@ export class WebOSPackagerPlugin implements Plugin {
 		this.hook.apply(compiler);
 	}
 
-	private static validateOptions(options: PackageMetadata & PackagerOptions & Namespace) {
+	private static validateAndResolveMetadata(options: WebOSPackagerPluginOptions): PackageMetadata {
 		assertIdentifier('id', options.id);
-		assertNonEmptyString('version', options.version);
 
 		if (options.type !== 'app' && options.type !== 'service') {
 			throw new TypeError('WebOSPackagerPlugin: "type" must be "app" or "service".');
 		}
 
 		assertPackagerOptions(options);
+		const version = resolveVersion(options, 'options');
+
+		return {
+			id: options.id,
+			version,
+		};
 	}
 }
 
@@ -287,8 +454,8 @@ export const hoc =
 	<E extends Record<string, any> = {}>(definition: HOCDefinition) =>
 	(...argv: [WebpackEnvironment<E>, WebpackArgv<E>]) => {
 		assertIdentifier('definition.id', definition.id);
-		assertNonEmptyString('definition.version', definition.version);
 		assertPackagerOptions(definition.options, 'definition.options');
+		const version = resolveVersion(definition, 'definition');
 
 		const invoke = (config: FlavoredConfig) =>
 			Object.defineProperties(typeof config === 'function' ? config(...argv) : config, {
@@ -297,7 +464,7 @@ export const hoc =
 
 		const packager = new AssetPackagerPlugin(definition.options ?? null, {
 			id: definition.id,
-			version: definition.version,
+			version,
 		});
 
 		const app = invoke(definition.app);

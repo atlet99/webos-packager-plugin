@@ -3,8 +3,11 @@ const path = require('path');
 
 const tests = [
 	'regression.watch.js',
+	'regression.failed-recovery.js',
 	'regression.traversal.js',
 	'regression.plugin-options.js',
+	'regression.output-options.js',
+	'regression.version-source.js',
 	'regression.service-only.js',
 	'regression.service-prefix.js',
 	'regression.invalid-id.js',

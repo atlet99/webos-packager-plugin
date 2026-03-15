@@ -63,10 +63,6 @@ export class IPKBuilder {
 	}
 
 	public async buffer(): Promise<Buffer> {
-		if (!this.metadata) {
-			throw new IPKBuilderError('Package metadata not set.');
-		}
-
 		await this.appendControlSection();
 		await this.appendDataSection();
 
@@ -116,7 +112,7 @@ export class IPKBuilder {
 	private async collectTarball(packer: Pack): Promise<Buffer> {
 		packer.finalize();
 
-		const chunks = [];
+		const chunks: Buffer[] = [];
 
 		for await (const chunk of packer.pipe(createGzip({ level: constants.Z_BEST_COMPRESSION }))) {
 			chunks.push(chunk);

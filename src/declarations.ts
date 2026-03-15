@@ -31,6 +31,13 @@ export type PackageMetadata = {
 	version: string;
 };
 
+export type PackageMetadataInput = {
+	id: string;
+	version?: string;
+	versionFile?: string;
+	versionEnv?: string;
+};
+
 export type ControlSection = Record<
 	'Package' | 'Version' | 'Section' | 'Priority' | 'Architecture' | 'webOS-Package-Format-Version',
 	string | number
@@ -40,6 +47,15 @@ export type HookDeferredValue = {
 	namespace: Namespace;
 	assets: Compilation['assets'];
 };
+
+export type OutputFilenameContext = {
+	id: string;
+	version: string;
+	ext: 'ipk';
+	baseName: string;
+};
+
+export type OutputFilename = string | ((context: OutputFilenameContext) => string);
 
 type HomebrewManifest = {
 	title: string;
@@ -57,11 +73,21 @@ type MaybeHomebrewOptionsMixin =
 			manifest: HomebrewManifest;
 	  };
 
-export type PackagerOptions = MaybeHomebrewOptionsMixin & {
-	filename?: string;
+export type OutputOptions = {
+	dir?: string;
+	filename?: OutputFilename;
+	template?: string;
+	variables?: Record<string, string | number | boolean>;
 };
 
-export type HOCDefinition = PackageMetadata & {
+export type PackagerOptions = MaybeHomebrewOptionsMixin & {
+	filename?: OutputFilename;
+	output?: OutputOptions;
+};
+
+export type WebOSPackagerPluginOptions = PackageMetadataInput & PackagerOptions & Namespace;
+
+export type HOCDefinition = PackageMetadataInput & {
 	options?: PackagerOptions;
 	app: FlavoredConfig;
 	services?: FlavoredConfig[];
