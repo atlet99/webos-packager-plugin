@@ -48,7 +48,7 @@ help:
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "format" "Format source files with Prettier"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "format-check" "Check formatting with Prettier"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "lint-make" "Lint Makefile with checkmake"
-	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test" "Run build + regression tests"
+	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test" "Run all tests (regression, e2e, plugin, hoc)"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test-e2e" "Run end-to-end feature scenarios"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test-plugin" "Run webpack plugin integration test"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test-hoc" "Run webpack HOC integration test"
@@ -125,7 +125,7 @@ regression:
 	@$(NPM) run test:regression
 	@$(PRINT_OK) "Regression tests passed"
 
-test: build regression
+test: build regression test-e2e test-plugin test-hoc
 
 test-e2e:
 	@$(PRINT_TITLE) "Running end-to-end tests"

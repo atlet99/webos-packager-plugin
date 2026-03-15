@@ -24,5 +24,3 @@ jobs:
       - run: make install
       - run: make format-check
       - run: make test
-      - run: make test-plugin
-      - run: make test-hoc
