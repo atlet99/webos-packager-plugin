@@ -38,7 +38,7 @@ PRINT_ERR = printf "$(RED)[error]$(RESET) %s\n"
 
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor install build format format-check lint-make regression test test-plugin test-hoc verify ci pack clean clean-all tag-release release-pr
+.PHONY: help doctor install build format format-check lint-make regression test test-e2e test-plugin test-hoc verify ci pack clean clean-all tag-release release-pr
 
 help:
 	@printf "$(BOLD)Available targets$(RESET)\n"
@@ -49,6 +49,7 @@ help:
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "format-check" "Check formatting with Prettier"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "lint-make" "Lint Makefile with checkmake"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test" "Run build + regression tests"
+	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test-e2e" "Run end-to-end feature scenarios"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test-plugin" "Run webpack plugin integration test"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test-hoc" "Run webpack HOC integration test"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "verify" "Run full local validation suite"
@@ -125,6 +126,11 @@ regression:
 	@$(PRINT_OK) "Regression tests passed"
 
 test: build regression
+
+test-e2e:
+	@$(PRINT_TITLE) "Running end-to-end tests"
+	@$(NPM) run test:e2e
+	@$(PRINT_OK) "End-to-end tests passed"
 
 test-plugin:
 	@$(PRINT_TITLE) "Running plugin integration test"

@@ -34,8 +34,10 @@ This package integrates webOS packaging directly into webpack output and emits
 | Service naming    | Service id should start with app id           | Same rule validated during package build |
 | Build integration | Separate build + package steps                | Single webpack flow                      |
 
-> [!IMPORTANT] This library does not deploy to device/emulator. Use `webos-cli`
-> for install, launch, inspect, and debugging.
+> [!IMPORTANT]
+>
+> This library does not deploy to device/emulator. Use `webos-cli` for install,
+> launch, inspect, and debugging.
 
 ### Quick Decision Guide
 
@@ -44,7 +46,9 @@ This package integrates webOS packaging directly into webpack output and emits
 - Use `output.template`/`output.variables` when CI controls artifact naming.
 - Use `versionFile` for app/IPK versioning in monorepos.
 
-> [!TIP] Keep IPK versioning (`version`, `versionFile`, env) separate from the
+> [!TIP]
+>
+> Keep IPK versioning (`version`, `versionFile`, env) separate from the
 > library's own `package.json` version.
 
 ### Quick Start (HOC)
@@ -149,11 +153,15 @@ Available output tokens:
 - `[baseName]`
 - custom keys from `output.variables`
 
-> [!WARNING] Unknown template tokens fail the build intentionally. This prevents
-> publishing artifacts with accidental names.
+> [!WARNING]
+>
+> Unknown template tokens fail the build intentionally. This prevents publishing
+> artifacts with accidental names.
 
-> [!WARNING] Output path must stay inside webpack output assets. Unsafe values
-> like `../` are rejected.
+> [!WARNING]
+>
+> Output path must stay inside webpack output assets. Unsafe values like `../`
+> are rejected.
 
 ### Version Source (`.release-version`)
 
@@ -183,10 +191,14 @@ new WebOSPackagerPlugin({
 });
 ```
 
-> [!IMPORTANT] If you provide `version`, it overrides env and `versionFile`.
+> [!IMPORTANT]
+>
+> If you provide `version`, it overrides env and `versionFile`.
 
-> [!WARNING] Version must match `x.y.z`, `x.y.z-suffix`, or
-> `x.y.z-suffix+build`. Invalid values fail fast.
+> [!WARNING]
+>
+> Version must match `x.y.z`, `x.y.z-suffix`, or `x.y.z-suffix+build`. Invalid
+> values fail fast.
 
 ### Scenario: CI Build With Dynamic Artifact Name
 
@@ -239,7 +251,9 @@ export default [
 ];
 ```
 
-> [!TIP] In monorepos, keep one `.release-version` per app package if apps have
+> [!TIP]
+>
+> In monorepos, keep one `.release-version` per app package if apps have
 > independent release cycles.
 
 ### Common Mistakes
@@ -250,8 +264,10 @@ export default [
 - Using unresolved tokens in `output.template`.
 - Trying to write output with `../`.
 
-> [!WARNING] Service ids must start with app id. For app `com.example.app`,
-> valid service ids look like `com.example.app.svc`.
+> [!WARNING]
+>
+> Service ids must start with app id. For app `com.example.app`, valid service
+> ids look like `com.example.app.svc`.
 
 ### Release Flow
 
@@ -267,9 +283,11 @@ If you need to bump version first and open a PR to `master`:
 make tag-release VERSION=2.1.1
 ```
 
-> [!IMPORTANT] `VERSION=...` flow uses GitHub CLI. If `GH_TOKEN` or
-> `GITHUB_TOKEN` is set in your environment, interactive login is not required.
-> Otherwise run `gh auth login`.
+> [!IMPORTANT]
+>
+> `VERSION=...` flow uses GitHub CLI. If `GH_TOKEN` or `GITHUB_TOKEN` is set in
+> your environment, interactive login is not required. Otherwise run
+> `gh auth login`.
 
 By default, `AUTO_MERGE=1`: the PR is set to auto-squash after checks pass, then
 `master` is updated and tag creation runs automatically.
@@ -295,6 +313,7 @@ make format
 make format-check
 make lint-make
 make test
+make test-e2e
 make test-plugin
 make test-hoc
 make pack

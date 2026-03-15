@@ -40,7 +40,8 @@
 		"format:check:readme": "prettier --check README.md",
 		"pretest": "node -e \"const [maj,min]=process.versions.node.split('.').map(Number); if (maj < 14 || (maj === 14 && min < 10)) { console.error('Node >= 14.10 is required. Run: nvm use 25'); process.exit(1); }\"",
 		"test:regression": "node test/regression.js",
-		"test": "npm run build && npm run test:regression"
+		"test:e2e": "node test/e2e.js",
+		"test": "npm run build && npm run test:regression && npm run test:e2e"
 	},
 	"files": [
 		"dist",
