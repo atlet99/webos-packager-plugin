@@ -110,7 +110,15 @@ make pack
 Publishing is done by GitHub Actions on tag push.
 
 ```bash
-VERSION=$(node -p "require('./package.json').version")
-git tag "v$VERSION"
-git push origin "v$VERSION"
+make tag-release
 ```
+
+If you need to bump version first and open a PR to `master`:
+
+```bash
+make tag-release VERSION=2.1.1
+```
+
+Note: `VERSION=...` flow uses GitHub CLI. If `GH_TOKEN` or `GITHUB_TOKEN` is set
+in your environment, interactive login is not required. Otherwise run
+`gh auth login`.
