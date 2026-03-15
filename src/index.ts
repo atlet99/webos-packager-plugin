@@ -21,20 +21,11 @@ export type { FlavoredConfig } from './declarations';
 
 const assertIdentifier = (name: string, value: string) => {
 	if (typeof value !== 'string' || value.trim() === '') {
-		throw new TypeError(
-			`WebOSPackagerPlugin: "${name}" must be a non-empty string.`,
-		);
+		throw new TypeError(`WebOSPackagerPlugin: "${name}" must be a non-empty string.`);
 	}
 
-	if (
-		value === '.' ||
-		value === '..' ||
-		value.includes('/') ||
-		value.includes('\\')
-	) {
-		throw new TypeError(
-			`WebOSPackagerPlugin: "${name}" contains invalid path characters.`,
-		);
+	if (value === '.' || value === '..' || value.includes('/') || value.includes('\\')) {
+		throw new TypeError(`WebOSPackagerPlugin: "${name}" contains invalid path characters.`);
 	}
 };
 
@@ -89,8 +80,7 @@ class AssetPackagerPlugin extends AssetPlugin {
 		}
 
 		const filename =
-			this.options?.filename ??
-			`${this.metadata.id}_${this.metadata.version}_all.ipk`;
+			this.options?.filename ?? `${this.metadata.id}_${this.metadata.version}_all.ipk`;
 		const buffer = await builder.buffer();
 
 		compilation.emitAsset(filename, new sources.RawSource(buffer));
@@ -108,10 +98,7 @@ class AssetPackagerPlugin extends AssetPlugin {
 		}
 	}
 
-	private createManifestAsset(fileInfo: {
-		ipkUrl: string;
-		ipkHash: { sha256: string };
-	}) {
+	private createManifestAsset(fileInfo: { ipkUrl: string; ipkHash: { sha256: string } }) {
 		if (!this.options?.emitManifest) {
 			throw new TypeError('createManifestAsset: type guard');
 		}
@@ -226,21 +213,15 @@ export class WebOSPackagerPlugin implements Plugin {
 		this.hook.apply(compiler);
 	}
 
-	private static validateOptions(
-		options: PackageMetadata & PackagerOptions & Namespace,
-	) {
+	private static validateOptions(options: PackageMetadata & PackagerOptions & Namespace) {
 		assertIdentifier('id', options.id);
 
 		if (typeof options.version !== 'string' || options.version.trim() === '') {
-			throw new TypeError(
-				'WebOSPackagerPlugin: "version" must be a non-empty string.',
-			);
+			throw new TypeError('WebOSPackagerPlugin: "version" must be a non-empty string.');
 		}
 
 		if (options.type !== 'app' && options.type !== 'service') {
-			throw new TypeError(
-				'WebOSPackagerPlugin: "type" must be "app" or "service".',
-			);
+			throw new TypeError('WebOSPackagerPlugin: "type" must be "app" or "service".');
 		}
 	}
 }
@@ -251,12 +232,9 @@ export const hoc =
 		assertIdentifier('definition.id', definition.id);
 
 		const invoke = (config: FlavoredConfig) =>
-			Object.defineProperties(
-				typeof config === 'function' ? config(...argv) : config,
-				{
-					id: { enumerable: false },
-				},
-			);
+			Object.defineProperties(typeof config === 'function' ? config(...argv) : config, {
+				id: { enumerable: false },
+			});
 
 		const packager = new AssetPackagerPlugin(definition.options ?? null, {
 			id: definition.id,

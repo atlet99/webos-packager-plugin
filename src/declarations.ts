@@ -50,10 +50,12 @@ type HomebrewManifest = {
 	type?: 'web' | 'native';
 };
 
-type MaybeHomebrewOptionsMixin = { emitManifest?: false; } | {
-	emitManifest: true;
-	manifest: HomebrewManifest;
-};
+type MaybeHomebrewOptionsMixin =
+	| { emitManifest?: false }
+	| {
+			emitManifest: true;
+			manifest: HomebrewManifest;
+	  };
 
 export type PackagerOptions = MaybeHomebrewOptionsMixin & {
 	filename?: string;

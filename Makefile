@@ -29,13 +29,15 @@ PRINT_ERR = printf "$(RED)[error]$(RESET) %s\n"
 
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor install build regression test test-plugin test-hoc verify ci pack clean clean-all tag-release
+.PHONY: help doctor install build format format-check regression test test-plugin test-hoc verify ci pack clean clean-all tag-release
 
 help:
 	@printf "$(BOLD)Available targets$(RESET)\n"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "doctor" "Check local toolchain and Node version"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "install" "Install dependencies for root and ./test"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "build" "Build TypeScript sources"
+	@printf "  $(CYAN)%-14s$(RESET) %s\n" "format" "Format source files with Prettier"
+	@printf "  $(CYAN)%-14s$(RESET) %s\n" "format-check" "Check formatting with Prettier"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test" "Run build + regression tests"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test-plugin" "Run webpack plugin integration test"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test-hoc" "Run webpack HOC integration test"
@@ -78,6 +80,16 @@ build:
 	@$(NPM) run build
 	@$(PRINT_OK) "Build completed"
 
+format:
+	@$(PRINT_TITLE) "Formatting files"
+	@$(NPM) run format
+	@$(PRINT_OK) "Formatting completed"
+
+format-check:
+	@$(PRINT_TITLE) "Checking formatting"
+	@$(NPM) run format:check
+	@$(PRINT_OK) "Formatting check passed"
+
 regression:
 	@$(PRINT_TITLE) "Running regression tests"
 	@$(NPM) run test:regression
@@ -95,7 +107,7 @@ test-hoc:
 	@$(NPM) --prefix test run test-hoc
 	@$(PRINT_OK) "HOC integration test passed"
 
-verify: test test-plugin test-hoc
+verify: format-check test test-plugin test-hoc
 	@$(PRINT_OK) "Full verification passed"
 
 ci: install verify

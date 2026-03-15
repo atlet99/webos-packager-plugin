@@ -31,8 +31,11 @@
 	"maintainers": [
 		"atlet99"
 	],
+	"packageManager": "yarn@1.22.22",
 	"scripts": {
 		"build": "tsc",
+		"format": "npx --yes prettier@3.3.3 --write .",
+		"format:check": "npx --yes prettier@3.3.3 --check .",
 		"test:regression": "node test/regression.js",
 		"test": "npm run build && npm run test:regression"
 	},

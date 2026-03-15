@@ -22,6 +22,8 @@ Useful commands:
 
 ```bash
 make help
+make format
+make format-check
 make test
 make test-plugin
 make test-hoc
@@ -33,8 +35,8 @@ make pack
 Publishing is done by GitHub Actions on tag push.
 
 ```bash
-git tag v2.0.5
-git push origin v2.0.5
+git tag v2.1.0
+git push origin v2.1.0
 ```
 
 ### Example

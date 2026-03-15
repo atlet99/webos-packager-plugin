@@ -1,0 +1,11 @@
+dist
+test/dist
+node_modules
+test/node_modules
+.git
+.npm-cache
+tmp
+tmp-*
+yarn.lock
+package-lock.json
+Makefile
