@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { readFileSync } from 'fs';
 import { join, normalize } from 'path/posix';
 
 import { Compilation, sources, type Compiler } from 'webpack';
@@ -13,8 +14,10 @@ import type {
 	OutputFilename,
 	OutputFilenameContext,
 	PackageMetadata,
+	PackageMetadataInput,
 	PackagerOptions,
 	Plugin,
+	WebOSPackagerPluginOptions,
 	HookDeferredValue,
 	WebpackArgv,
 	WebpackEnvironment,
@@ -60,6 +63,54 @@ const assertOutputFilename = (name: string, value: unknown) => {
 	}
 
 	assertRelativePath(name, value);
+};
+
+const VERSION_REGEXP = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+const assertVersion = (name: string, value: unknown) => {
+	assertNonEmptyString(name, value);
+
+	if (!VERSION_REGEXP.test((value as string).trim())) {
+		throw new TypeError(
+			`WebOSPackagerPlugin: "${name}" must be a valid semver-like value (x.y.z[-suffix]).`,
+		);
+	}
+};
+
+const resolveVersion = (input: PackageMetadataInput, prefix: string) => {
+	if (input.version !== undefined) {
+		assertVersion(`${prefix}.version`, input.version);
+		return input.version.trim();
+	}
+
+	const envKey = input.versionEnv?.trim() || 'RELEASE_VERSION';
+	const envVersion = process.env[envKey];
+
+	if (typeof envVersion === 'string' && envVersion.trim() !== '') {
+		assertVersion(`env.${envKey}`, envVersion);
+		return envVersion.trim();
+	}
+
+	if (input.versionFile !== undefined) {
+		assertNonEmptyString(`${prefix}.versionFile`, input.versionFile);
+
+		let content = '';
+
+		try {
+			content = readFileSync(input.versionFile, 'utf8').trim();
+		} catch {
+			throw new TypeError(
+				`WebOSPackagerPlugin: "${prefix}.versionFile" could not be read: ${input.versionFile}`,
+			);
+		}
+
+		assertVersion(`${prefix}.versionFile`, content);
+		return content;
+	}
+
+	throw new TypeError(
+		`WebOSPackagerPlugin: "${prefix}.version" must be provided, or set env "${envKey}", or provide "${prefix}.versionFile".`,
+	);
 };
 
 const assertPackagerOptions = (options: PackagerOptions | null | undefined, prefix = 'options') => {
@@ -368,10 +419,10 @@ export class WebOSPackagerPlugin implements Plugin {
 	private readonly packager: AssetPackagerPlugin;
 	private readonly hook: AssetHookPlugin;
 
-	public constructor(options: PackageMetadata & PackagerOptions & Namespace) {
-		WebOSPackagerPlugin.validateOptions(options);
+	public constructor(options: WebOSPackagerPluginOptions) {
+		const metadata = WebOSPackagerPlugin.validateAndResolveMetadata(options);
 
-		this.packager = new AssetPackagerPlugin(options, options);
+		this.packager = new AssetPackagerPlugin(options, metadata);
 		this.hook = new AssetHookPlugin(options);
 
 		this.packager.register(this.hook);
@@ -382,15 +433,20 @@ export class WebOSPackagerPlugin implements Plugin {
 		this.hook.apply(compiler);
 	}
 
-	private static validateOptions(options: PackageMetadata & PackagerOptions & Namespace) {
+	private static validateAndResolveMetadata(options: WebOSPackagerPluginOptions): PackageMetadata {
 		assertIdentifier('id', options.id);
-		assertNonEmptyString('version', options.version);
 
 		if (options.type !== 'app' && options.type !== 'service') {
 			throw new TypeError('WebOSPackagerPlugin: "type" must be "app" or "service".');
 		}
 
 		assertPackagerOptions(options);
+		const version = resolveVersion(options, 'options');
+
+		return {
+			id: options.id,
+			version,
+		};
 	}
 }
 
@@ -398,8 +454,8 @@ export const hoc =
 	<E extends Record<string, any> = {}>(definition: HOCDefinition) =>
 	(...argv: [WebpackEnvironment<E>, WebpackArgv<E>]) => {
 		assertIdentifier('definition.id', definition.id);
-		assertNonEmptyString('definition.version', definition.version);
 		assertPackagerOptions(definition.options, 'definition.options');
+		const version = resolveVersion(definition, 'definition');
 
 		const invoke = (config: FlavoredConfig) =>
 			Object.defineProperties(typeof config === 'function' ? config(...argv) : config, {
@@ -408,7 +464,7 @@ export const hoc =
 
 		const packager = new AssetPackagerPlugin(definition.options ?? null, {
 			id: definition.id,
-			version: definition.version,
+			version,
 		});
 
 		const app = invoke(definition.app);

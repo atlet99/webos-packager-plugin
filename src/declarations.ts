@@ -31,6 +31,13 @@ export type PackageMetadata = {
 	version: string;
 };
 
+export type PackageMetadataInput = {
+	id: string;
+	version?: string;
+	versionFile?: string;
+	versionEnv?: string;
+};
+
 export type ControlSection = Record<
 	'Package' | 'Version' | 'Section' | 'Priority' | 'Architecture' | 'webOS-Package-Format-Version',
 	string | number
@@ -78,7 +85,9 @@ export type PackagerOptions = MaybeHomebrewOptionsMixin & {
 	output?: OutputOptions;
 };
 
-export type HOCDefinition = PackageMetadata & {
+export type WebOSPackagerPluginOptions = PackageMetadataInput & PackagerOptions & Namespace;
+
+export type HOCDefinition = PackageMetadataInput & {
 	options?: PackagerOptions;
 	app: FlavoredConfig;
 	services?: FlavoredConfig[];
