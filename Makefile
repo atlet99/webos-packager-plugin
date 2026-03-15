@@ -44,10 +44,11 @@ help:
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "pack" "Build and run npm pack --dry-run"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "clean" "Remove build/test artifacts"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "clean-all" "Remove artifacts and node_modules"
-	@printf "  $(CYAN)%-14s$(RESET) %s\n" "tag-release" "Create release tag matching package.json"
+	@printf "  $(CYAN)%-14s$(RESET) %s\n" "tag-release" "Create and push release tag matching package.json"
 	@printf "\n"
 	@printf "$(YELLOW)Usage$(RESET)\n"
 	@printf "  make tag-release VERSION=x.y.z\n"
+	@printf "  make tag-release\n"
 	@printf "  make NO_COLOR=1 help\n"
 
 doctor:
@@ -116,12 +117,21 @@ clean-all: clean
 
 tag-release:
 	@$(PRINT_TITLE) "Creating release tag"
-	@test -n "$(VERSION)" || { $(PRINT_ERR) "Use: make tag-release VERSION=x.y.z"; exit 1; }
 	@PKG_VERSION="$$($(NODE) -p "require('./package.json').version")"; \
-	if [ "$$PKG_VERSION" != "$(VERSION)" ]; then \
-		$(PRINT_ERR) "package.json version ($$PKG_VERSION) does not match VERSION ($(VERSION))"; \
+	TAG_VERSION="$(VERSION)"; \
+	if [ -z "$$TAG_VERSION" ]; then \
+		TAG_VERSION="$$PKG_VERSION"; \
+		$(PRINT_WARN) "VERSION is not provided, using package.json version ($$TAG_VERSION)"; \
+	fi; \
+	if [ "$$PKG_VERSION" != "$$TAG_VERSION" ]; then \
+		$(PRINT_ERR) "package.json version ($$PKG_VERSION) does not match VERSION ($$TAG_VERSION)"; \
 		exit 1; \
-	fi
-	@git tag "v$(VERSION)"
-	@$(PRINT_OK) "Created tag v$(VERSION)"
-	@$(PRINT_WARN) "Push it with: git push origin v$(VERSION)"
+	fi; \
+	if git rev-parse --verify "v$$TAG_VERSION" >/dev/null 2>&1; then \
+		$(PRINT_ERR) "tag v$$TAG_VERSION already exists"; \
+		exit 1; \
+	fi; \
+	git tag "v$$TAG_VERSION"; \
+	$(PRINT_OK) "Created tag v$$TAG_VERSION"; \
+	git push --tags; \
+	$(PRINT_OK) "Pushed tags to remote"
