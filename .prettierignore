@@ -2,6 +2,7 @@ dist
 test/dist
 node_modules
 test/node_modules
+.firecrawl
 .git
 .npm-cache
 tmp
