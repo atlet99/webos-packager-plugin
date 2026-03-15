@@ -9,3 +9,4 @@ tmp-*
 yarn.lock
 package-lock.json
 Makefile
+LICENSE.md

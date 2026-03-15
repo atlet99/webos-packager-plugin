@@ -29,6 +29,64 @@ const assertIdentifier = (name: string, value: string) => {
 	}
 };
 
+const assertNonEmptyString = (name: string, value: unknown) => {
+	if (typeof value !== 'string' || value.trim() === '') {
+		throw new TypeError(`WebOSPackagerPlugin: "${name}" must be a non-empty string.`);
+	}
+};
+
+const assertPackagerOptions = (options: PackagerOptions | null | undefined, prefix = 'options') => {
+	if (!options) {
+		return;
+	}
+
+	if (options.filename !== undefined) {
+		assertNonEmptyString(`${prefix}.filename`, options.filename);
+	}
+
+	if (!options.emitManifest) {
+		return;
+	}
+
+	const manifest = (options as PackagerOptions & { emitManifest: true }).manifest;
+
+	if (!manifest || typeof manifest !== 'object') {
+		throw new TypeError(`WebOSPackagerPlugin: "${prefix}.manifest" must be provided.`);
+	}
+
+	const requiredStringFields = ['title', 'description', 'iconUrl', 'sourceUrl'] as const;
+
+	for (const key of requiredStringFields) {
+		if (typeof manifest[key] !== 'string') {
+			throw new TypeError(`WebOSPackagerPlugin: "${prefix}.manifest.${key}" must be a string.`);
+		}
+	}
+
+	for (const [key, value] of Object.entries(manifest)) {
+		if (key === 'rootRequired') {
+			if (value !== undefined && typeof value !== 'boolean') {
+				throw new TypeError(
+					`WebOSPackagerPlugin: "${prefix}.manifest.rootRequired" must be a boolean.`,
+				);
+			}
+			continue;
+		}
+
+		if (key === 'type') {
+			if (value !== undefined && value !== 'web' && value !== 'native') {
+				throw new TypeError(
+					`WebOSPackagerPlugin: "${prefix}.manifest.type" must be "web" or "native".`,
+				);
+			}
+			continue;
+		}
+
+		if (typeof value !== 'string') {
+			throw new TypeError(`WebOSPackagerPlugin: "${prefix}.manifest.${key}" must be a string.`);
+		}
+	}
+};
+
 abstract class AssetPlugin implements Plugin {
 	protected abstract readonly pluginName: string;
 
@@ -215,14 +273,13 @@ export class WebOSPackagerPlugin implements Plugin {
 
 	private static validateOptions(options: PackageMetadata & PackagerOptions & Namespace) {
 		assertIdentifier('id', options.id);
-
-		if (typeof options.version !== 'string' || options.version.trim() === '') {
-			throw new TypeError('WebOSPackagerPlugin: "version" must be a non-empty string.');
-		}
+		assertNonEmptyString('version', options.version);
 
 		if (options.type !== 'app' && options.type !== 'service') {
 			throw new TypeError('WebOSPackagerPlugin: "type" must be "app" or "service".');
 		}
+
+		assertPackagerOptions(options);
 	}
 }
 
@@ -230,6 +287,8 @@ export const hoc =
 	<E extends Record<string, any> = {}>(definition: HOCDefinition) =>
 	(...argv: [WebpackEnvironment<E>, WebpackArgv<E>]) => {
 		assertIdentifier('definition.id', definition.id);
+		assertNonEmptyString('definition.version', definition.version);
+		assertPackagerOptions(definition.options, 'definition.options');
 
 		const invoke = (config: FlavoredConfig) =>
 			Object.defineProperties(typeof config === 'function' ? config(...argv) : config, {

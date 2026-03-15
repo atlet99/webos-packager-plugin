@@ -35,7 +35,9 @@
 	"scripts": {
 		"build": "tsc",
 		"format": "npx --yes prettier@3.3.3 --write .",
+		"format:readme": "npx --yes prettier@3.3.3 --write README.md",
 		"format:check": "npx --yes prettier@3.3.3 --check .",
+		"format:check:readme": "npx --yes prettier@3.3.3 --check README.md",
 		"test:regression": "node test/regression.js",
 		"test": "npm run build && npm run test:regression"
 	},

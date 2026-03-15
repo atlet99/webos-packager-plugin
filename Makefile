@@ -83,11 +83,13 @@ build:
 format:
 	@$(PRINT_TITLE) "Formatting files"
 	@$(NPM) run format
+	@$(NPM) run format:readme
 	@$(PRINT_OK) "Formatting completed"
 
 format-check:
 	@$(PRINT_TITLE) "Checking formatting"
 	@$(NPM) run format:check
+	@$(NPM) run format:check:readme
 	@$(PRINT_OK) "Formatting check passed"
 
 regression:
