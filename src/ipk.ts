@@ -6,11 +6,7 @@ import { Pack, pack } from 'tar-stream';
 import { ArWriter } from './ar';
 import { getDirectoryParents } from './utils';
 
-import type {
-	ControlSection,
-	Namespace,
-	PackageMetadata,
-} from './declarations';
+import type { ControlSection, Namespace, PackageMetadata } from './declarations';
 
 const NAMESPACE_MAP: Record<Namespace['type'], string> = {
 	app: 'applications',
@@ -36,10 +32,7 @@ export class IPKBuilder {
 		this.ar.append('debian-binary', '2.0\n');
 	}
 
-	public addEntries(
-		{ id, type }: Namespace,
-		assets: { [path: string]: Buffer },
-	) {
+	public addEntries({ id, type }: Namespace, assets: { [path: string]: Buffer }) {
 		const namespaceId = this.normalizeIdentifier(id, `${type} id`);
 		const root = `usr/palm/${NAMESPACE_MAP[type]}/${namespaceId}`;
 		const tree = new Set<string>(getDirectoryParents(root));
@@ -85,10 +78,7 @@ export class IPKBuilder {
 			return false;
 		}
 
-		return (
-			buffer.readUInt32BE() === ELF_MAGIC ||
-			buffer.readUInt16BE() === SHEBANG_MAGIC
-		);
+		return buffer.readUInt32BE() === ELF_MAGIC || buffer.readUInt16BE() === SHEBANG_MAGIC;
 	}
 
 	private normalizeAssetPath(path: string): string {
@@ -128,18 +118,14 @@ export class IPKBuilder {
 
 		const chunks = [];
 
-		for await (const chunk of packer.pipe(
-			createGzip({ level: constants.Z_BEST_COMPRESSION }),
-		)) {
+		for await (const chunk of packer.pipe(createGzip({ level: constants.Z_BEST_COMPRESSION }))) {
 			chunks.push(chunk);
 		}
 
 		return Buffer.concat(chunks);
 	}
 
-	private async appendControlSection(
-		overrides?: Partial<ControlSection>,
-	): Promise<void> {
+	private async appendControlSection(overrides?: Partial<ControlSection>): Promise<void> {
 		const tarball = pack();
 
 		const control: ControlSection = {
@@ -164,9 +150,7 @@ export class IPKBuilder {
 
 	private async appendDataSection() {
 		if (this.namespaces.app.size !== 1) {
-			throw new IPKBuilderError(
-				'Package must include exactly one app namespace.',
-			);
+			throw new IPKBuilderError('Package must include exactly one app namespace.');
 		}
 
 		const app = this.namespaces.app.values().next().value!;
@@ -175,9 +159,7 @@ export class IPKBuilder {
 			id: this.packageId,
 			version: this.metadata.version,
 			app,
-			services: Array.from(this.namespaces.service.values()).sort((a, b) =>
-				a.localeCompare(b),
-			),
+			services: Array.from(this.namespaces.service.values()).sort((a, b) => a.localeCompare(b)),
 		};
 
 		const root = `usr/palm/packages/${this.packageId}`;

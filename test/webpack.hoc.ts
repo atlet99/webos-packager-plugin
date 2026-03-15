@@ -23,13 +23,15 @@ export default hoc({
 			path: join(__dirname, 'dist/hoc'),
 		},
 	},
-	services: [{
-		id: 'com.example.app.service',
-		mode: 'development',
-		entry: './src/service.js',
-		output: {
-			filename: 'service.js',
-			path: join(__dirname, 'dist/hoc'),
+	services: [
+		{
+			id: 'com.example.app.service',
+			mode: 'development',
+			entry: './src/service.js',
+			output: {
+				filename: 'service.js',
+				path: join(__dirname, 'dist/hoc'),
+			},
 		},
-	}],
+	],
 });

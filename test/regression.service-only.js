@@ -4,10 +4,7 @@ const path = require('path');
 const webpack = require('webpack');
 const { WebOSPackagerPlugin } = require('../dist');
 
-const workdir = path.join(
-	os.tmpdir(),
-	`webos-packager-service-only-${Date.now()}`,
-);
+const workdir = path.join(os.tmpdir(), `webos-packager-service-only-${Date.now()}`);
 
 webpack(
 	{

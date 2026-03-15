@@ -34,12 +34,7 @@ const run = () =>
 			}
 
 			if (!stats || stats.hasErrors()) {
-				reject(
-					new Error(
-						stats?.toString({ all: false, errors: true }) ??
-							'Compilation failed.',
-					),
-				);
+				reject(new Error(stats?.toString({ all: false, errors: true }) ?? 'Compilation failed.'));
 				return;
 			}
 
