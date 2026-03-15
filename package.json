@@ -34,14 +34,18 @@
 	"packageManager": "yarn@1.22.22",
 	"scripts": {
 		"build": "tsc",
-		"format": "npx --yes prettier@3.3.3 --write .",
-		"format:check": "npx --yes prettier@3.3.3 --check .",
+		"format": "prettier --write .",
+		"format:readme": "prettier --write README.md",
+		"format:check": "prettier --check .",
+		"format:check:readme": "prettier --check README.md",
 		"test:regression": "node test/regression.js",
 		"test": "npm run build && npm run test:regression"
 	},
 	"files": [
 		"dist",
-		"package.json"
+		"package.json",
+		"README.md",
+		"LICENSE.md"
 	],
 	"publishConfig": {
 		"access": "public"
@@ -55,6 +59,7 @@
 	"devDependencies": {
 		"@types/node": "^18.15.11",
 		"@types/tar-stream": "^2.2.2",
+		"prettier": "^3.3.3",
 		"typescript": "^4.9.5",
 		"webpack": "^5.88.2"
 	}

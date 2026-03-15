@@ -154,12 +154,22 @@ export class IPKBuilder {
 		}
 
 		const app = this.namespaces.app.values().next().value!;
+		const services = Array.from(this.namespaces.service.values()).sort((a, b) =>
+			a.localeCompare(b),
+		);
+		const invalidService = services.find(
+			service => service !== app && !service.startsWith(`${app}.`),
+		);
+
+		if (invalidService) {
+			throw new IPKBuilderError(`Service id "${invalidService}" must start with app id "${app}".`);
+		}
 
 		const packageInfo = {
 			id: this.packageId,
 			version: this.metadata.version,
 			app,
-			services: Array.from(this.namespaces.service.values()).sort((a, b) => a.localeCompare(b)),
+			services,
 		};
 
 		const root = `usr/palm/packages/${this.packageId}`;

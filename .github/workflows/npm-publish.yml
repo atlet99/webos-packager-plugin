@@ -8,18 +8,23 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-permissions:
-  contents: read
-  id-token: write
+concurrency:
+  group: publish-${{ github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
   publish-npm:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
         with:
-          node-version: 18
+          node-version: 22
           registry-url: https://registry.npmjs.org/
           cache: yarn
       - name: Validate tag matches package version
@@ -31,6 +36,26 @@ jobs:
             exit 1
           fi
       - run: make ci
-      - run: npm publish --provenance
+      - name: Pack npm artifact
+        run: npm pack
+      - name: Build checksums
+        run: shasum -a 256 *.tgz > checksums.txt
+      - name: Publish to npm
+        run: npm publish --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PRIVATE_TOKEN }}
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ contains(github.ref_name, '-') && 'false' || 'true' }}
+          files: |
+            *.tgz
+            checksums.txt
+          fail_on_unmatched_files: true
+          overwrite_files: true
