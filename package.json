@@ -1,12 +1,35 @@
 {
-	"name": "@webosbrew/webos-packager-plugin",
+	"name": "@atlet99/webos-packager-plugin",
 	"version": "2.0.4",
 	"description": "Pack applications for webOS on the fly.",
+	"keywords": [
+		"webos",
+		"ipk",
+		"webpack",
+		"plugin",
+		"packager"
+	],
+	"author": "Abdurakhman Rakhmankulov",
 	"license": "MIT",
 	"main": "dist/index.js",
-	"repository": "github:webosbrew/webos-packager-plugin",
+	"types": "dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"require": "./dist/index.js",
+			"default": "./dist/index.js"
+		}
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/atlet99/webos-packager-plugin.git"
+	},
+	"homepage": "https://github.com/atlet99/webos-packager-plugin#readme",
+	"bugs": {
+		"url": "https://github.com/atlet99/webos-packager-plugin/issues"
+	},
 	"maintainers": [
-		"kitsuned"
+		"atlet99"
 	],
 	"scripts": {
 		"build": "tsc",
@@ -16,6 +39,9 @@
 		"dist",
 		"package.json"
 	],
+	"publishConfig": {
+		"access": "public"
+	},
 	"engines": {
 		"node": ">= 14.10"
 	},

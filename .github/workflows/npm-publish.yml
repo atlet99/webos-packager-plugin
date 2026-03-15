@@ -1,8 +1,13 @@
 name: Publish to registry
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   publish-npm:
@@ -13,9 +18,18 @@ jobs:
         with:
           node-version: 18
           registry-url: https://registry.npmjs.org/
+          cache: yarn
+      - name: Validate tag matches package version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "Tag version ($TAG) does not match package.json version ($VERSION)"
+            exit 1
+          fi
       - run: corepack enable
       - run: yarn install --frozen-lockfile
-      - run: yarn build
-      - run: yarn publish
+      - run: yarn test
+      - run: npm publish --provenance
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTOMATION_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PRIVATE_TOKEN }}
