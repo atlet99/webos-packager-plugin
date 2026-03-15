@@ -110,6 +110,7 @@ make pack
 Publishing is done by GitHub Actions on tag push.
 
 ```bash
-git tag v2.1.0
-git push origin v2.1.0
+VERSION=$(node -p "require('./package.json').version")
+git tag "v$VERSION"
+git push origin "v$VERSION"
 ```
