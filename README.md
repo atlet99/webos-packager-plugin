@@ -1,13 +1,48 @@
-# @webosbrew/webos-packager-plugin
+# @atlet99/webos-packager-plugin
 
 Pack applications to IPK on the fly.
+
+Fork notice: this package is forked from the original `@webosbrew/webos-packager-plugin`.
+Original author and credit: kitsuned (Andrey Smirnov).
+
+### Installation
+
+```bash
+npm install @atlet99/webos-packager-plugin
+```
+
+### Development
+
+```bash
+make install
+make verify
+```
+
+Useful commands:
+
+```bash
+make help
+make test
+make test-plugin
+make test-hoc
+make pack
+```
+
+### Release
+
+Publishing is done by GitHub Actions on tag push.
+
+```bash
+git tag v2.0.5
+git push origin v2.0.5
+```
 
 ### Example
 
 ##### HOC
 
 ```typescript
-import { hoc } from '@webosbrew/webos-packager-plugin';
+import { hoc } from '@atlet99/webos-packager-plugin';
 
 export default hoc({
 	id: 'org.acme.product',
@@ -39,7 +74,7 @@ export default hoc({
 ##### Plugin
 
 ```typescript
-import { WebOSPackagerPlugin } from '@webosbrew/webos-packager-plugin';
+import { WebOSPackagerPlugin } from '@atlet99/webos-packager-plugin';
 
 export default {
 	// ... webpack configuation
@@ -47,6 +82,7 @@ export default {
 		new WebOSPackagerPlugin({
 			id: 'com.example.app',
 			version: '1.0.0',
+			type: 'app',
 		}),
 	],
 };

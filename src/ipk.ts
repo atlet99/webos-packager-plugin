@@ -1,12 +1,16 @@
 import { constants, createGzip } from 'zlib';
-import { dirname, join } from 'path/posix';
+import { dirname, join, normalize } from 'path/posix';
 
 import { Pack, pack } from 'tar-stream';
 
 import { ArWriter } from './ar';
 import { getDirectoryParents } from './utils';
 
-import type { ControlSection, Namespace, PackageMetadata } from './declarations';
+import type {
+	ControlSection,
+	Namespace,
+	PackageMetadata,
+} from './declarations';
 
 const NAMESPACE_MAP: Record<Namespace['type'], string> = {
 	app: 'applications',
@@ -19,6 +23,7 @@ const SHEBANG_MAGIC = 0x2321;
 export class IPKBuilder {
 	private readonly ar = new ArWriter();
 	private readonly data = pack();
+	private readonly packageId: string;
 	private readonly namespaces: Record<Namespace['type'], Set<string>> = {
 		app: new Set(),
 		service: new Set(),
@@ -26,17 +31,25 @@ export class IPKBuilder {
 	private readonly createdParents = new Set<string>();
 
 	public constructor(private readonly metadata: PackageMetadata) {
+		this.packageId = this.normalizeIdentifier(metadata.id, 'package id');
 		this.ar.append('debian-binary', '2.0\n');
 	}
 
-	public addEntries({ id, type }: Namespace, assets: { [path: string]: Buffer }) {
-		const root = `usr/palm/${NAMESPACE_MAP[type]}/${id}`;
+	public addEntries(
+		{ id, type }: Namespace,
+		assets: { [path: string]: Buffer },
+	) {
+		const namespaceId = this.normalizeIdentifier(id, `${type} id`);
+		const root = `usr/palm/${NAMESPACE_MAP[type]}/${namespaceId}`;
 		const tree = new Set<string>(getDirectoryParents(root));
+		const entries = Object.entries(assets).map(
+			([asset, buffer]) => [this.normalizeAssetPath(asset), buffer] as const,
+		);
 
-		this.namespaces[type].add(id);
+		this.namespaces[type].add(namespaceId);
 
-		for (const path in assets) {
-			tree.add(join(root, dirname(path)));
+		for (const [asset] of entries) {
+			tree.add(join(root, dirname(asset)));
 		}
 
 		for (const name of tree) {
@@ -47,8 +60,8 @@ export class IPKBuilder {
 			this.createdParents.add(name);
 		}
 
-		for (const [asset, buffer] of Object.entries(assets)) {
-			const name = `${root}/${asset}`;
+		for (const [asset, buffer] of entries) {
+			const name = join(root, asset);
 			const mode = this.isExecutable(buffer) ? 0o755 : 0o644;
 
 			this.data.entry({ name, mode }, buffer);
@@ -77,6 +90,38 @@ export class IPKBuilder {
 		);
 	}
 
+	private normalizeAssetPath(path: string): string {
+		const target = normalize(path.replace(/\\/g, '/'));
+
+		if (
+			target === '' ||
+			target === '.' ||
+			target === '..' ||
+			target.startsWith('../') ||
+			target.includes('/../') ||
+			target.startsWith('/')
+		) {
+			throw new IPKBuilderError(`Invalid asset path: ${path}`);
+		}
+
+		return target;
+	}
+
+	private normalizeIdentifier(value: string, kind: string): string {
+		if (
+			typeof value !== 'string' ||
+			value.trim() === '' ||
+			value === '.' ||
+			value === '..' ||
+			value.includes('/') ||
+			value.includes('\\')
+		) {
+			throw new IPKBuilderError(`Invalid ${kind}: ${value}`);
+		}
+
+		return value;
+	}
+
 	private async collectTarball(packer: Pack): Promise<Buffer> {
 		packer.finalize();
 
@@ -91,11 +136,13 @@ export class IPKBuilder {
 		return Buffer.concat(chunks);
 	}
 
-	private async appendControlSection(overrides?: Partial<ControlSection>): Promise<void> {
+	private async appendControlSection(
+		overrides?: Partial<ControlSection>,
+	): Promise<void> {
 		const tarball = pack();
 
 		const control: ControlSection = {
-			Package: this.metadata.id,
+			Package: this.packageId,
 			Version: this.metadata.version,
 			Section: 'misc',
 			Priority: 'optional',
@@ -115,14 +162,22 @@ export class IPKBuilder {
 	}
 
 	private async appendDataSection() {
+		if (this.namespaces.app.size !== 1) {
+			throw new IPKBuilderError(
+				'Package must include exactly one app namespace.',
+			);
+		}
+
+		const app = this.namespaces.app.values().next().value!;
+
 		const packageInfo = {
-			id: this.metadata.id,
+			id: this.packageId,
 			version: this.metadata.version,
-			app: this.namespaces.app.values().next().value!,
+			app,
 			services: Array.from(this.namespaces.service.values()),
 		};
 
-		const root = `usr/palm/packages/${this.metadata.id}`;
+		const root = `usr/palm/packages/${this.packageId}`;
 
 		for (const name of getDirectoryParents(root)) {
 			if (!this.createdParents.has(name)) {
