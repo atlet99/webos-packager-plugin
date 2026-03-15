@@ -13,9 +13,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 18
-      - run: corepack enable
-      - run: yarn install --frozen-lockfile
-      - run: yarn --cwd test install --frozen-lockfile
-      - run: yarn test
-      - run: yarn --cwd test test-plugin
-      - run: yarn --cwd test test-hoc
+          cache: yarn
+      - run: make ci

@@ -11,6 +11,23 @@ Original author and credit: kitsuned (Andrey Smirnov).
 npm install @atlet99/webos-packager-plugin
 ```
 
+### Development
+
+```bash
+make install
+make verify
+```
+
+Useful commands:
+
+```bash
+make help
+make test
+make test-plugin
+make test-hoc
+make pack
+```
+
 ### Release
 
 Publishing is done by GitHub Actions on tag push.

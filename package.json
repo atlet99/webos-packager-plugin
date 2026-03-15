@@ -1,6 +1,6 @@
 {
 	"name": "@atlet99/webos-packager-plugin",
-	"version": "2.0.4",
+	"version": "2.1.0",
 	"description": "Pack applications for webOS on the fly.",
 	"keywords": [
 		"webos",
@@ -33,7 +33,8 @@
 	],
 	"scripts": {
 		"build": "tsc",
-		"test": "npm run build && node test/regression.watch.js && node test/regression.traversal.js && node test/regression.plugin-options.js && node test/regression.service-only.js && node test/regression.invalid-id.js && node test/regression.hoc-service-error.js"
+		"test:regression": "node test/regression.js",
+		"test": "npm run build && npm run test:regression"
 	},
 	"files": [
 		"dist",

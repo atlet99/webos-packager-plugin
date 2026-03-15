@@ -27,9 +27,7 @@ jobs:
             echo "Tag version ($TAG) does not match package.json version ($VERSION)"
             exit 1
           fi
-      - run: corepack enable
-      - run: yarn install --frozen-lockfile
-      - run: yarn test
+      - run: make ci
       - run: npm publish --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PRIVATE_TOKEN }}
