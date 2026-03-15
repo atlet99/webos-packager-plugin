@@ -38,6 +38,7 @@
 		"format:readme": "prettier --write README.md",
 		"format:check": "prettier --check .",
 		"format:check:readme": "prettier --check README.md",
+		"pretest": "node -e \"const [maj,min]=process.versions.node.split('.').map(Number); if (maj < 14 || (maj === 14 && min < 10)) { console.error('Node >= 14.10 is required. Run: nvm use 25'); process.exit(1); }\"",
 		"test:regression": "node test/regression.js",
 		"test": "npm run build && npm run test:regression"
 	},

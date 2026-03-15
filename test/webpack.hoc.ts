@@ -9,9 +9,9 @@ export default hoc({
 		emitManifest: true,
 		manifest: {
 			title: 'Example App',
-			description: '',
-			iconUrl: '',
-			sourceUrl: '',
+			description: 'Example app description',
+			iconUrl: 'https://example.com/icon.png',
+			sourceUrl: 'https://example.com/source',
 		},
 	},
 	app: {

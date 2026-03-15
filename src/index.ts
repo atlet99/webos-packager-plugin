@@ -55,14 +55,21 @@ const assertPackagerOptions = (options: PackagerOptions | null | undefined, pref
 	}
 
 	const requiredStringFields = ['title', 'description', 'iconUrl', 'sourceUrl'] as const;
+	const allowedFields = new Set([
+		...requiredStringFields,
+		'rootRequired',
+		'type',
+	] satisfies ReadonlyArray<keyof typeof manifest>);
 
 	for (const key of requiredStringFields) {
-		if (typeof manifest[key] !== 'string') {
-			throw new TypeError(`WebOSPackagerPlugin: "${prefix}.manifest.${key}" must be a string.`);
-		}
+		assertNonEmptyString(`${prefix}.manifest.${key}`, manifest[key]);
 	}
 
 	for (const [key, value] of Object.entries(manifest)) {
+		if (!allowedFields.has(key as keyof typeof manifest)) {
+			throw new TypeError(`WebOSPackagerPlugin: "${prefix}.manifest.${key}" is not supported.`);
+		}
+
 		if (key === 'rootRequired') {
 			if (value !== undefined && typeof value !== 'boolean') {
 				throw new TypeError(
@@ -211,13 +218,6 @@ class AssetHookPlugin extends AssetPlugin {
 				assets: stats.compilation.assets,
 			});
 			this.pushedCompilations.add(stats.compilation);
-		});
-
-		compiler.hooks.failed.tap(this.pluginName, () => {
-			this.push({
-				namespace: this.namespace,
-				assets: {} as Compilation['assets'],
-			});
 		});
 	}
 
