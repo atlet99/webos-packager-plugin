@@ -321,4 +321,5 @@ make pack
 
 Makefile linting uses [checkmake](https://github.com/checkmake/checkmake) with
 project config from `checkmake.ini`. If local `checkmake` is unavailable, the
-`lint-make` target falls back to the official container image.
+`lint-make` target downloads `checkmake` for your current OS/arch
+(`linux|darwin`, `amd64|arm64`) using `CHECKMAKE_VERSION`.

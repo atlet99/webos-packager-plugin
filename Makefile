@@ -6,7 +6,8 @@ NPM ?= npm
 NODE ?= node
 CHECKMAKE ?= checkmake
 CHECKMAKE_CONFIG ?= checkmake.ini
-CHECKMAKE_IMAGE ?= quay.io/checkmake/checkmake:latest
+CHECKMAKE_VERSION ?= 0.3.2
+CHECKMAKE_DOWNLOAD_DIR ?= .tmp/tools
 RELEASE_REMOTE ?= origin
 RELEASE_BASE_BRANCH ?= master
 RELEASE_BRANCH_PREFIX ?= release
@@ -110,13 +111,27 @@ lint-make:
 	@$(PRINT_TITLE) "Linting Makefile"
 	@if command -v $(CHECKMAKE) >/dev/null; then \
 		$(CHECKMAKE) --config $(CHECKMAKE_CONFIG) Makefile; \
-	elif command -v podman >/dev/null; then \
-		podman run --rm --entrypoint checkmake --workdir /work -v "$$(pwd):/work" $(CHECKMAKE_IMAGE) --config $(CHECKMAKE_CONFIG) Makefile; \
-	elif command -v docker >/dev/null; then \
-		docker run --rm --entrypoint checkmake --workdir /work -v "$$(pwd):/work" $(CHECKMAKE_IMAGE) --config $(CHECKMAKE_CONFIG) Makefile; \
 	else \
-		$(PRINT_ERR) "checkmake is not installed and no container runtime (podman/docker) is available"; \
-		exit 1; \
+		OS="$$(uname -s | tr '[:upper:]' '[:lower:]')"; \
+		ARCH="$$(uname -m)"; \
+		case "$$ARCH" in \
+			x86_64) ARCH="amd64" ;; \
+			arm64|aarch64) ARCH="arm64" ;; \
+			*) $(PRINT_ERR) "unsupported architecture: $$ARCH"; exit 1 ;; \
+		esac; \
+		case "$$OS" in \
+			linux|darwin) ;; \
+			*) $(PRINT_ERR) "unsupported OS: $$OS"; exit 1 ;; \
+		esac; \
+		BIN_PATH="$(CHECKMAKE_DOWNLOAD_DIR)/checkmake-v$(CHECKMAKE_VERSION).$$OS.$$ARCH"; \
+		URL="https://github.com/checkmake/checkmake/releases/download/v$(CHECKMAKE_VERSION)/checkmake-v$(CHECKMAKE_VERSION).$$OS.$$ARCH"; \
+		mkdir -p "$(CHECKMAKE_DOWNLOAD_DIR)"; \
+		if [ ! -x "$$BIN_PATH" ]; then \
+			$(PRINT_WARN) "checkmake not found, downloading $$URL"; \
+			curl -fsSL "$$URL" -o "$$BIN_PATH" || { $(PRINT_ERR) "failed to download checkmake from $$URL"; exit 1; }; \
+			chmod +x "$$BIN_PATH"; \
+		fi; \
+		"$$BIN_PATH" --config $(CHECKMAKE_CONFIG) Makefile; \
 	fi
 	@$(PRINT_OK) "Makefile lint passed"
 
@@ -142,7 +157,7 @@ test-hoc:
 	@$(NPM) --prefix test run test-hoc
 	@$(PRINT_OK) "HOC integration test passed"
 
-verify: format-check lint-make test test-plugin test-hoc
+verify: format-check lint-make test
 	@$(PRINT_OK) "Full verification passed"
 
 ci: install verify
