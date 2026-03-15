@@ -111,9 +111,9 @@ lint-make:
 	@if command -v $(CHECKMAKE) >/dev/null; then \
 		$(CHECKMAKE) --config $(CHECKMAKE_CONFIG) Makefile; \
 	elif command -v podman >/dev/null; then \
-		podman run --rm --workdir /work -v "$$(pwd):/work" $(CHECKMAKE_IMAGE) --config $(CHECKMAKE_CONFIG) Makefile; \
+		podman run --rm --entrypoint checkmake --workdir /work -v "$$(pwd):/work" $(CHECKMAKE_IMAGE) --config $(CHECKMAKE_CONFIG) Makefile; \
 	elif command -v docker >/dev/null; then \
-		docker run --rm --workdir /work -v "$$(pwd):/work" $(CHECKMAKE_IMAGE) --config $(CHECKMAKE_CONFIG) Makefile; \
+		docker run --rm --entrypoint checkmake --workdir /work -v "$$(pwd):/work" $(CHECKMAKE_IMAGE) --config $(CHECKMAKE_CONFIG) Makefile; \
 	else \
 		$(PRINT_ERR) "checkmake is not installed and no container runtime (podman/docker) is available"; \
 		exit 1; \
