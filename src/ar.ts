@@ -1,7 +1,7 @@
 class ArFile {
 	private static readonly MAX_IDENTIFIER_LENGTH = 16;
 
-	private timestamp = Math.floor(Date.now() / 1000);
+	private timestamp = 0;
 	private ownerId = 0;
 	private groupId = 0;
 	private fileMode = 100644;
