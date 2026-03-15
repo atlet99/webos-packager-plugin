@@ -41,6 +41,15 @@ export type HookDeferredValue = {
 	assets: Compilation['assets'];
 };
 
+export type OutputFilenameContext = {
+	id: string;
+	version: string;
+	ext: 'ipk';
+	baseName: string;
+};
+
+export type OutputFilename = string | ((context: OutputFilenameContext) => string);
+
 type HomebrewManifest = {
 	title: string;
 	description: string;
@@ -57,8 +66,16 @@ type MaybeHomebrewOptionsMixin =
 			manifest: HomebrewManifest;
 	  };
 
+export type OutputOptions = {
+	dir?: string;
+	filename?: OutputFilename;
+	template?: string;
+	variables?: Record<string, string | number | boolean>;
+};
+
 export type PackagerOptions = MaybeHomebrewOptionsMixin & {
-	filename?: string;
+	filename?: OutputFilename;
+	output?: OutputOptions;
 };
 
 export type HOCDefinition = PackageMetadata & {

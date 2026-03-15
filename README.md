@@ -93,6 +93,70 @@ export default {
 };
 ```
 
+### Flexible IPK Output (CI/Monorepo Friendly)
+
+You can keep legacy `filename`, or use `output` for richer control.
+
+```typescript
+new WebOSPackagerPlugin({
+  id: 'com.example.app',
+  version: '1.0.0',
+  type: 'app',
+  output: {
+    dir: 'artifacts/webos',
+    template: '[id]-[version]-[channel].[ext]',
+    variables: {
+      channel: process.env.CHANNEL ?? 'local',
+    },
+  },
+});
+```
+
+Dynamic filename function is also supported:
+
+```typescript
+new WebOSPackagerPlugin({
+  id: 'com.example.app',
+  version: process.env.RELEASE_VERSION ?? '1.0.0',
+  type: 'app',
+  filename: ({ id, version, ext }) => `releases/${id}_${version}_ci.${ext}`,
+});
+```
+
+### Monorepo Pattern (3 IPK Builds)
+
+```typescript
+import { join } from 'path';
+import { WebOSPackagerPlugin } from '@atlet99/webos-packager-plugin';
+
+const createConfig = (id: string, entry: string, channel: string) => ({
+  mode: 'production',
+  entry,
+  output: {
+    filename: 'main.js',
+    path: join(__dirname, `dist/${id}`),
+  },
+  plugins: [
+    new WebOSPackagerPlugin({
+      id,
+      version: process.env.RELEASE_VERSION ?? '1.0.0',
+      type: 'app',
+      output: {
+        dir: 'artifacts/ipk',
+        template: '[id]-[version]-[channel].[ext]',
+        variables: { channel },
+      },
+    }),
+  ],
+});
+
+export default [
+  createConfig('com.example.app.alpha', './packages/alpha/src/app.js', 'alpha'),
+  createConfig('com.example.app.beta', './packages/beta/src/app.js', 'beta'),
+  createConfig('com.example.app.gamma', './packages/gamma/src/app.js', 'gamma'),
+];
+```
+
 ### Development
 
 ```bash

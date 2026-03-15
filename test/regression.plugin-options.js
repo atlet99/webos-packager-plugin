@@ -88,3 +88,38 @@ assert.throws(
 		message: 'WebOSPackagerPlugin: "options.manifest.unsupported" is not supported.',
 	},
 );
+
+assert.throws(
+	() =>
+		new WebOSPackagerPlugin({
+			id: 'com.example.app',
+			version: '1.0.0',
+			type: 'app',
+			output: {
+				dir: '../dist',
+			},
+		}),
+	{
+		name: 'TypeError',
+		message: 'WebOSPackagerPlugin: "options.output.dir" contains invalid path segments.',
+	},
+);
+
+assert.throws(
+	() =>
+		new WebOSPackagerPlugin({
+			id: 'com.example.app',
+			version: '1.0.0',
+			type: 'app',
+			output: {
+				variables: {
+					channel: {},
+				},
+			},
+		}),
+	{
+		name: 'TypeError',
+		message:
+			'WebOSPackagerPlugin: "options.output.variables.channel" must be a string, number or boolean.',
+	},
+);

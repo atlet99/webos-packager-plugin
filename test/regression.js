@@ -6,6 +6,7 @@ const tests = [
 	'regression.failed-recovery.js',
 	'regression.traversal.js',
 	'regression.plugin-options.js',
+	'regression.output-options.js',
 	'regression.service-only.js',
 	'regression.service-prefix.js',
 	'regression.invalid-id.js',
