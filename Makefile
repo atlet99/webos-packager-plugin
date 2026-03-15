@@ -4,9 +4,15 @@ COREPACK ?= corepack
 YARN ?= yarn
 NPM ?= npm
 NODE ?= node
+CHECKMAKE ?= checkmake
+CHECKMAKE_CONFIG ?= checkmake.ini
+CHECKMAKE_IMAGE ?= quay.io/checkmake/checkmake:latest
 RELEASE_REMOTE ?= origin
 RELEASE_BASE_BRANCH ?= master
 RELEASE_BRANCH_PREFIX ?= release
+AUTO_MERGE ?= 1
+MERGE_WAIT_TIMEOUT ?= 3600
+MERGE_POLL_INTERVAL ?= 10
 NO_COLOR ?=
 
 ifeq ($(NO_COLOR),1)
@@ -32,7 +38,7 @@ PRINT_ERR = printf "$(RED)[error]$(RESET) %s\n"
 
 .DEFAULT_GOAL := help
 
-.PHONY: help doctor install build format format-check regression test test-plugin test-hoc verify ci pack clean clean-all tag-release release-pr
+.PHONY: help doctor install build format format-check lint-make regression test test-plugin test-hoc verify ci pack clean clean-all tag-release release-pr
 
 help:
 	@printf "$(BOLD)Available targets$(RESET)\n"
@@ -41,6 +47,7 @@ help:
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "build" "Build TypeScript sources"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "format" "Format source files with Prettier"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "format-check" "Check formatting with Prettier"
+	@printf "  $(CYAN)%-14s$(RESET) %s\n" "lint-make" "Lint Makefile with checkmake"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test" "Run build + regression tests"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test-plugin" "Run webpack plugin integration test"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "test-hoc" "Run webpack HOC integration test"
@@ -50,12 +57,13 @@ help:
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "clean" "Remove build/test artifacts"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "clean-all" "Remove artifacts and node_modules"
 	@printf "  $(CYAN)%-14s$(RESET) %s\n" "tag-release" "Create release tag from package.json or start release PR flow"
-	@printf "  $(CYAN)%-14s$(RESET) %s\n" "release-pr" "Create release PR to master for VERSION=x.y.z"
+	@printf "  $(CYAN)%-14s$(RESET) %s\n" "release-pr" "Create release PR and optionally auto-merge for VERSION=x.y.z"
 	@printf "\n"
 	@printf "$(YELLOW)Usage$(RESET)\n"
 	@printf "  make tag-release VERSION=x.y.z\n"
 	@printf "  make tag-release\n"
-	@printf "  make release-pr VERSION=x.y.z\n"
+	@printf "  make release-pr VERSION=x.y.z AUTO_MERGE=1\n"
+	@printf "  make release-pr VERSION=x.y.z AUTO_MERGE=0\n"
 	@printf "  make NO_COLOR=1 help\n"
 
 doctor:
@@ -97,6 +105,20 @@ format-check:
 	@$(NPM) run format:check:readme
 	@$(PRINT_OK) "Formatting check passed"
 
+lint-make:
+	@$(PRINT_TITLE) "Linting Makefile"
+	@if command -v $(CHECKMAKE) >/dev/null; then \
+		$(CHECKMAKE) --config $(CHECKMAKE_CONFIG) Makefile; \
+	elif command -v podman >/dev/null; then \
+		podman run --rm --workdir /work -v "$$(pwd):/work" $(CHECKMAKE_IMAGE) --config $(CHECKMAKE_CONFIG) Makefile; \
+	elif command -v docker >/dev/null; then \
+		docker run --rm --workdir /work -v "$$(pwd):/work" $(CHECKMAKE_IMAGE) --config $(CHECKMAKE_CONFIG) Makefile; \
+	else \
+		$(PRINT_ERR) "checkmake is not installed and no container runtime (podman/docker) is available"; \
+		exit 1; \
+	fi
+	@$(PRINT_OK) "Makefile lint passed"
+
 regression:
 	@$(PRINT_TITLE) "Running regression tests"
 	@$(NPM) run test:regression
@@ -114,7 +136,7 @@ test-hoc:
 	@$(NPM) --prefix test run test-hoc
 	@$(PRINT_OK) "HOC integration test passed"
 
-verify: format-check test test-plugin test-hoc
+verify: format-check lint-make test test-plugin test-hoc
 	@$(PRINT_OK) "Full verification passed"
 
 ci: install verify
@@ -172,11 +194,18 @@ release-pr:
 		$(PRINT_ERR) "Working tree is not clean. Commit or stash changes first."; \
 		exit 1; \
 	fi
-	@AUTH_TOKEN="$${GH_TOKEN:-$${GITHUB_TOKEN:-}}"; \
+	@set -e; \
+	AUTH_TOKEN="$${GH_TOKEN:-$${GITHUB_TOKEN:-}}"; \
+	if [ -n "$$AUTH_TOKEN" ]; then export GH_TOKEN="$$AUTH_TOKEN"; fi; \
 	TAG_VERSION="$(VERSION)"; \
+	CURRENT_VERSION="$$($(NODE) -p "require('./package.json').version")"; \
 	TAG_NAME="v$$TAG_VERSION"; \
 	COMMIT_MESSAGE="[ADD] - release v$$TAG_VERSION;"; \
 	BRANCH_NAME="$(RELEASE_BRANCH_PREFIX)/v$$TAG_VERSION"; \
+	if [ "$$CURRENT_VERSION" = "$$TAG_VERSION" ]; then \
+		$(PRINT_ERR) "VERSION ($$TAG_VERSION) is already set in package.json"; \
+		exit 1; \
+	fi; \
 	if ! $(NODE) -e "const v=process.argv[1]; if(!/^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$$/.test(v)){process.exit(1)}" "$$TAG_VERSION"; then \
 		$(PRINT_ERR) "VERSION must look like x.y.z or x.y.z-suffix"; \
 		exit 1; \
@@ -205,10 +234,37 @@ release-pr:
 	if [ -f yarn.lock ]; then git add yarn.lock; fi; \
 	git commit -m "$$COMMIT_MESSAGE"; \
 	git push -u "$(RELEASE_REMOTE)" "$$BRANCH_NAME"; \
-	if [ -n "$$AUTH_TOKEN" ]; then \
-		PR_URL="$$(GH_TOKEN="$$AUTH_TOKEN" gh pr create --base "$(RELEASE_BASE_BRANCH)" --head "$$BRANCH_NAME" --title "$$COMMIT_MESSAGE" --body "Automated release bump to $$TAG_NAME.\n\nAfter merge to $(RELEASE_BASE_BRANCH), run:\n\nmake tag-release")"; \
-	else \
+	PR_URL="$$(gh pr list --base "$(RELEASE_BASE_BRANCH)" --head "$$BRANCH_NAME" --state open --json url --jq '.[0].url')"; \
+	if [ -z "$$PR_URL" ]; then \
 		PR_URL="$$(gh pr create --base "$(RELEASE_BASE_BRANCH)" --head "$$BRANCH_NAME" --title "$$COMMIT_MESSAGE" --body "Automated release bump to $$TAG_NAME.\n\nAfter merge to $(RELEASE_BASE_BRANCH), run:\n\nmake tag-release")"; \
 	fi; \
 	$(PRINT_OK) "Created PR: $$PR_URL"; \
-	$(PRINT_WARN) "Merge PR into $(RELEASE_BASE_BRANCH), then run: make tag-release"
+	if [ "$(AUTO_MERGE)" != "1" ]; then \
+		$(PRINT_WARN) "AUTO_MERGE is disabled. Merge PR into $(RELEASE_BASE_BRANCH), then run: make tag-release"; \
+		exit 0; \
+	fi; \
+	gh pr merge "$$PR_URL" --squash --auto --delete-branch; \
+	$(PRINT_OK) "Auto-merge enabled, waiting for required checks..."; \
+	WAITED=0; \
+	while true; do \
+		PR_STATE="$$(gh pr view "$$PR_URL" --json state --jq '.state')"; \
+		if [ "$$PR_STATE" = "MERGED" ]; then \
+			$(PRINT_OK) "PR merged"; \
+			break; \
+		fi; \
+		if [ "$$PR_STATE" = "CLOSED" ]; then \
+			$(PRINT_ERR) "PR was closed without merge"; \
+			exit 1; \
+		fi; \
+		if [ "$$WAITED" -ge "$(MERGE_WAIT_TIMEOUT)" ]; then \
+			$(PRINT_ERR) "Timed out waiting for merge after $(MERGE_WAIT_TIMEOUT)s"; \
+			exit 1; \
+		fi; \
+		sleep "$(MERGE_POLL_INTERVAL)"; \
+		WAITED=$$((WAITED + $(MERGE_POLL_INTERVAL))); \
+	done; \
+	git fetch "$(RELEASE_REMOTE)" "$(RELEASE_BASE_BRANCH)"; \
+	git checkout "$(RELEASE_BASE_BRANCH)"; \
+	git pull --ff-only "$(RELEASE_REMOTE)" "$(RELEASE_BASE_BRANCH)"; \
+	$(MAKE) tag-release VERSION= RELEASE_REMOTE="$(RELEASE_REMOTE)" RELEASE_BASE_BRANCH="$(RELEASE_BASE_BRANCH)" RELEASE_BRANCH_PREFIX="$(RELEASE_BRANCH_PREFIX)"; \
+	$(PRINT_OK) "Release flow completed"

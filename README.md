@@ -99,11 +99,16 @@ Useful commands:
 make help
 make format
 make format-check
+make lint-make
 make test
 make test-plugin
 make test-hoc
 make pack
 ```
+
+Makefile linting uses [checkmake](https://github.com/checkmake/checkmake) with
+project config from `checkmake.ini`. If local `checkmake` is unavailable, the
+`lint-make` target falls back to the official container image.
 
 ### Release
 
@@ -122,3 +127,12 @@ make tag-release VERSION=2.1.1
 Note: `VERSION=...` flow uses GitHub CLI. If `GH_TOKEN` or `GITHUB_TOKEN` is set
 in your environment, interactive login is not required. Otherwise run
 `gh auth login`.
+
+By default, `AUTO_MERGE=1`: the PR is set to auto-squash after checks pass, then
+`master` is updated and tag creation runs automatically.
+
+To keep merge manual:
+
+```bash
+make tag-release VERSION=2.1.1 AUTO_MERGE=0
+```
