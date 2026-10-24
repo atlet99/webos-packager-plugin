@@ -1,6 +1,6 @@
 {
 	"name": "@atlet99/webos-packager-plugin",
-	"version": "2.1.2",
+	"version": "2.2.0",
 	"description": "Pack applications for webOS on the fly.",
 	"keywords": [
 		"webos",
