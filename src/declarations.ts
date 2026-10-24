@@ -1,26 +1,3 @@
-import type { Compiler, Compilation, Configuration } from 'webpack';
-
-export type WebpackEnvironment<Argv extends Record<string, any>> = Argv;
-
-export type WebpackArgv<Argv extends Record<string, any>> = Partial<Pick<Configuration, 'mode'>> & {
-	env: WebpackEnvironment<Argv>;
-};
-
-type WebpackConfigurationFn<
-	Flavor extends Record<string, any>,
-	Argv extends Record<string, any>,
-> = (env: WebpackEnvironment<Argv>, argv: WebpackArgv<Argv>) => Configuration & Flavor;
-
-type Config<Flavor extends Record<string, any>> =
-	| (Configuration & Flavor)
-	| WebpackConfigurationFn<Flavor, {}>;
-
-export type Plugin = {
-	apply(compiler: Compiler): void;
-};
-
-export type FlavoredConfig = Config<{ id: string }>;
-
 export type Namespace = {
 	id: string;
 	type: 'app' | 'service';
@@ -43,9 +20,20 @@ export type ControlSection = Record<
 	string | number
 >;
 
-export type HookDeferredValue = {
-	namespace: Namespace;
-	assets: Compilation['assets'];
+export type ControlSectionExtra = {
+	Description?: string;
+	Maintainer?: string;
+	'Installed-Size'?: string | number;
+};
+
+export type Asset = Buffer | { data: Buffer; mode?: number };
+
+export type AssetMap = { [path: string]: Asset };
+
+export type IPKBuilderOptions = PackageMetadata & {
+	primaryApp?: string;
+	mtime?: number;
+	control?: ControlSectionExtra;
 };
 
 export type OutputFilenameContext = {
@@ -86,9 +74,3 @@ export type PackagerOptions = MaybeHomebrewOptionsMixin & {
 };
 
 export type WebOSPackagerPluginOptions = PackageMetadataInput & PackagerOptions & Namespace;
-
-export type HOCDefinition = PackageMetadataInput & {
-	options?: PackagerOptions;
-	app: FlavoredConfig;
-	services?: FlavoredConfig[];
-};

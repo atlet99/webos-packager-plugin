@@ -31,6 +31,6 @@ webpack(
 			),
 		].join('\n');
 
-		assert.ok(details.includes('Package must include exactly one app namespace.'));
+		assert.ok(details.includes('Package must include at least one app namespace.'));
 	},
 );

@@ -43,6 +43,8 @@ This package integrates webOS packaging directly into webpack output and emits
 
 - Use `WebOSPackagerPlugin` if you have a single webpack config.
 - Use `hoc(...)` if you bundle app + one or more services together.
+- Use `@atlet99/webos-packager-plugin/core` if you need IPK packaging without
+  webpack (GitHub Actions, scripts, custom pipelines).
 - Use `output.template`/`output.variables` when CI controls artifact naming.
 - Use `versionFile` for app/IPK versioning in monorepos.
 
@@ -114,6 +116,82 @@ export default {
   ],
 };
 ```
+
+### Standalone Packaging (no webpack)
+
+The `@atlet99/webos-packager-plugin/core` entry point exposes `IPKBuilder` and
+does not load webpack. It is useful for GitHub Actions, scripts, and custom
+build tools. webpack is declared as an optional peer dependency, so standalone
+users do not install it.
+
+```typescript
+import { readFileSync } from 'fs';
+import { IPKBuilder } from '@atlet99/webos-packager-plugin/core';
+
+const builder = new IPKBuilder({
+  id: 'com.example.app',
+  version: '1.0.0',
+  primaryApp: 'com.example.app',
+  mtime: 1761000000,
+});
+
+builder.addEntries(
+  { id: 'com.example.app', type: 'app' },
+  {
+    'index.html': Buffer.from('<!DOCTYPE html>...'),
+    'main.js': { data: readFileSync('dist/main.js'), mode: 0o644 },
+  },
+);
+
+builder.addEntries(
+  { id: 'com.example.app.notify', type: 'app' },
+  {
+    'index.html': notificationHtml,
+  },
+);
+
+builder.addEntries(
+  { id: 'com.example.app.svc', type: 'service' },
+  {
+    'bootstrap.sh': { data: bootstrap, mode: 0o755 },
+    'inputhook/ezinject': { data: injector, mode: 0o755 },
+    'inputhook/lib.so': { data: library, mode: 0o644 },
+  },
+);
+
+const ipk = await builder.buffer();
+```
+
+A package may contain multiple apps and services. Every namespace is stored
+under its own directory (`usr/palm/applications/<id>/`,
+`usr/palm/services/<id>/`).
+
+> [!IMPORTANT]
+>
+> `primaryApp` is required when more than one app is added. It must be one of
+> the added apps and is written as the `app` field of `packageinfo.json`.
+> With a single app it can be omitted.
+
+Validation and reproducibility rules:
+
+- Service ids must equal or start with one of the packaged app ids.
+- Asset paths must be relative and stay inside their namespace; duplicate paths
+  and file/directory conflicts are rejected.
+- Explicit `mode` overrides the ELF/shebang heuristic. Plain buffers keep the
+  heuristic: executables get `0o755`, other files `0o644`.
+- `mtime` accepts Unix seconds and applies to every tar entry. Priority:
+  explicit `mtime` → `SOURCE_DATE_EPOCH` → legacy `0` default. Invalid values
+  fail fast.
+- Paths are sorted independently of the system locale. Identical inputs with
+  the same `mtime` produce byte-identical IPKs.
+- Optional `control` fields: `Description`, `Maintainer`, `Installed-Size`.
+  Values must be single-line; core fields like `Package` and `Version` cannot
+  be overridden.
+
+> [!WARNING]
+>
+> The main entry point imports webpack. Use `/core` when webpack is not
+> installed.
 
 ### Output Naming and Path Rules
 
@@ -266,8 +344,8 @@ export default [
 
 > [!WARNING]
 >
-> Service ids must start with app id. For app `com.example.app`, valid service
-> ids look like `com.example.app.svc`.
+> Service ids must equal or start with one of the packaged app ids. For app
+> `com.example.app`, valid service ids look like `com.example.app.svc`.
 
 ### Release Flow
 
