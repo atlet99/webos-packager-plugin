@@ -6,24 +6,29 @@ import { Compilation, sources, type Compiler } from 'webpack';
 
 import { IPKBuilder } from './ipk';
 import { Deferred } from './utils';
+import { VERSION_REGEXP } from './validation';
 
 import type {
 	FlavoredConfig,
 	HOCDefinition,
+	HookDeferredValue,
+	Plugin,
+	WebpackArgv,
+	WebpackEnvironment,
+} from './webpack-declarations';
+import type {
 	Namespace,
 	OutputFilename,
 	OutputFilenameContext,
 	PackageMetadata,
 	PackageMetadataInput,
 	PackagerOptions,
-	Plugin,
 	WebOSPackagerPluginOptions,
-	HookDeferredValue,
-	WebpackArgv,
-	WebpackEnvironment,
 } from './declarations';
 
-export type { FlavoredConfig } from './declarations';
+export * from './core';
+
+export type { FlavoredConfig } from './webpack-declarations';
 
 const assertIdentifier = (name: string, value: string) => {
 	if (typeof value !== 'string' || value.trim() === '') {
@@ -64,8 +69,6 @@ const assertOutputFilename = (name: string, value: unknown) => {
 
 	assertRelativePath(name, value);
 };
-
-const VERSION_REGEXP = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 const assertVersion = (name: string, value: unknown) => {
 	assertNonEmptyString(name, value);

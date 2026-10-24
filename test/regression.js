@@ -12,6 +12,8 @@ const tests = [
 	'regression.service-prefix.js',
 	'regression.invalid-id.js',
 	'regression.hoc-service-error.js',
+	'regression.core.js',
+	'regression.core-mtime.js',
 ];
 
 for (const test of tests) {

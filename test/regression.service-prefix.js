@@ -42,7 +42,9 @@ webpack(config, (error, stats) => {
 	].join('\n');
 
 	assert.ok(
-		details.includes('Service id "com.example.service" must start with app id "com.example.app".'),
+		details.includes(
+			'Service id "com.example.service" must equal or start with one of the packaged app ids: com.example.app.',
+		),
 	);
 });
 
